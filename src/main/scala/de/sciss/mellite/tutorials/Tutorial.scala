@@ -2,7 +2,7 @@ package de.sciss.mellite.tutorials
 
 import java.awt.event.{ActionListener, ComponentAdapter, ComponentEvent, ComponentListener, HierarchyEvent, HierarchyListener, InputEvent}
 import java.awt.image.BufferedImage
-import java.awt.{Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Point, Rectangle, Robot}
+import java.awt.{Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Image, MouseInfo, Point, Rectangle, Robot, Toolkit}
 
 import de.sciss.desktop.Window
 import de.sciss.file._
@@ -152,13 +152,16 @@ trait Tutorial {
         }
 
         m1.addChangeListener(cl)
+        val sz = m1.getSize()
+        val wh = sz.width   >> 1
+        val hh = sz.height   >> 1
 
         // println(s"Waiting again: ${m1.getText} -- $press")
         val pt = m1.getLocationOnScreen
         if (press)
-          pressMouse(pt.x + 4, pt.y + 4)
+          pressMouse(pt.x + wh, pt.y + hh)
         else
-          moveMouse (pt.x + 4, pt.y + 4)
+          moveMouse (pt.x + wh, pt.y + hh)
 
         res1.future
       }
@@ -318,14 +321,30 @@ trait Tutorial {
     res.future
   }
 
-  def snapWindow(w: Window, name: String): Future[Unit] =
+  def snapWindow(w: Window, name: String, pointer: Boolean = true): Future[Unit] =
     delay(repaintDelay).flatMap( _ =>
-      ensureFlatEDT(snapWindowEDT(w, name))
+      ensureFlatEDT(snapWindowEDT(w, name, pointer = pointer))
     )
 
-  private def snapWindowEDT(w: Window, name: String): Future[Unit] = try {
+  private[this] lazy val pointerImg: Image = {
+    val url = getClass.getResource("/GnomePointer.png")
+//    Toolkit.getDefaultToolkit.getImage(url)
+    ImageIO.read(url)
+    // Toolkit.getDefaultToolkit.createImage(url)
+  }
+
+  private def snapWindowEDT(w: Window, name: String, pointer: Boolean): Future[Unit] = try {
     requireEDT()
     val img = robot.createScreenCapture(graphicsConfiguration.getBounds)
+    if (pointer) {
+      val pi = MouseInfo.getPointerInfo
+      val pm = pi.getLocation
+      val gImg = img.createGraphics()
+//      println(s"pointerImg = $pointerImg")
+      gImg.drawImage(pointerImg, pm.x - 1, pm.y - 1, null)  // hot-spot: (1, 1)
+      gImg.dispose()
+    }
+
     val c   = w.component
     val pt  = c.locationOnScreen
     val sz  = c.size
