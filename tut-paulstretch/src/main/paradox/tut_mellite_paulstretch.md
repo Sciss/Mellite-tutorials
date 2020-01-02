@@ -68,7 +68,7 @@ editor:
 
 ![Popup for New Object](.../tut-paulstretch-fscape-in-folder.png)
 
-## Giving it a Spin
+## Giving FScape a Spin
 
 The code editor in Mellite is provided by a light-weight component modelled loosely
 after the popular IntelliJ IDEA software---much less powerful, but sharing some of its visual cues and keyboard 
@@ -185,11 +185,10 @@ first 500 sample values of the sine oscillator:
 As you can see, the signal range is between -1.0 and +1.0, corresponding with the approach of most other signal
 processing software, including PD, Max, and SuperCollider.
 
-## Reading and Writing Audio Files
+## Adding an Audio File to the Workspace
 
-Now we are going to write the first program that transforms an existing audio file. The program will begin
-with a UGen that reads the existing (input) audio file, and it will end with a UGen that writes a new (output)
-audio file. First, let us find an audio file for testing. Here is a two seconds bell-like sound placed in the
+The next thing we want to do, is add an audio file to the workspace that we can use as input for our 
+FScape program-to-be. Here is a two seconds bell-like sound placed in the
 public domain:
 
 <audio controls>
@@ -236,9 +235,11 @@ audio file viewer, you should hear the playback and see the output meter moving 
 
 ![Compilation Error in FScape Code Editor](.../tut-paulstretch-audio-system-booted.png)
 
-----
+## Reading and Writing Audio Files in FScape
 
-Let us now return to the FScape code editor. The transform consists of a "normalization", i.e. we apply the maximum 
+Let us now __return to the FScape code editor__. We are going to write the first program that transforms an existing 
+audio file. The program will begin with a UGen that reads the existing (input) audio file, and it will end with a 
+UGen that writes a new (output) audio file. The transform consists of a "normalization", i.e. we apply the maximum 
 gain so that the signal range does not exceed -1.0 to +1.0, making the signal maximally loud while avoiding digital 
 clipping. In the first step, let's measure the maximum amplitude of the input signal:
 
