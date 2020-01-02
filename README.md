@@ -14,3 +14,12 @@ and comes with absolutely no warranties. To contact the author, send an email to
 ## requirements / installation
 
 This project compiles using [sbt](http://www.scala-sbt.org/).
+
+## settings
+
+For taking the reproducible screenshots, I use the following settings:
+
+- desktop is Gnome wit Adwaita dark and 1920x1080 resolution
+- jdk is 11
+- code font is 'Noto Mono' 15pt, no stretch, 110% line spacing
+- look and feel is Submin Light

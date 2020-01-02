@@ -7,6 +7,7 @@ import java.awt.{Color, EventQueue, GraphicsConfiguration, GraphicsDevice, Graph
 import de.sciss.desktop.Window
 import de.sciss.file._
 import de.sciss.mellite.{LogFrame, MainFrame, Mellite}
+import de.sciss.treetable.j.TreeTable
 import javax.imageio.ImageIO
 import javax.swing.event.{ChangeEvent, ChangeListener}
 import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JWindow, MenuElement, Timer}
@@ -110,10 +111,40 @@ trait Tutorial {
     releaseMouse()
   }
 
+  def createTempDir(): File = {
+    val res = File.createTemp(directory = true)
+    sys.addShutdownHook {
+      def deleteRecursively(f: File): Unit = {
+        if (f.isDirectory) Option(f.listFiles).getOrElse(Array.empty).foreach(deleteRecursively)
+        if (!f.delete()) f.deleteOnExit()
+      }
+      deleteRecursively(res)
+    }
+    res
+  }
+
+  def pressKey(code: Int): Unit = {
+    requireEDT()
+    robot.keyPress  (code)
+  }
+
+  def releaseKey(code: Int): Unit = {
+    requireEDT()
+    robot.keyRelease(code)
+  }
+
   def typeKey(code: Int): Unit = {
     requireEDT()
     robot.keyPress  (code)
     robot.keyRelease(code)
+  }
+
+  def typeModKey(modifier: Int, code: Int): Unit = {
+    requireEDT()
+    robot.keyPress  (modifier)
+    robot.keyPress  (code)
+    robot.keyRelease(code)
+    robot.keyRelease(modifier)
   }
 
   implicit val executionContext: ExecutionContext = ExecutionContext.global
@@ -470,11 +501,33 @@ trait Tutorial {
     }
   }
 
+  def windowComponent(w: Window): Component = {
+    requireEDT()
+    w.component.contents.head
+  }
+
+  def resizeWindow(w: Window, dx: Int = 0, dy: Int = 0): Unit = {
+    requireEDT()
+    w.component.peer match {
+      case jf: JFrame => jf.setSize(jf.getWidth + dx, jf.getHeight + dy)
+      case _ =>
+        println("Warning: could not resize window")
+    }
+  }
+
   def findWindow(title: String): Window = {
     onEDT()
     val opt = Mellite.windowHandler.windows.find(_.title == title)
     val w = opt.getOrElse(sys.error(s"Window '$title' not found'"))
     w
+  }
+
+  def closeWindowComponent(title: String): Unit = {
+    val opt = java.awt.Window.getWindows.collectFirst {
+      case f: JFrame  if f.getTitle == title => f.dispose(); ()
+      case d: JDialog if d.getTitle == title => d.dispose(); ()
+    }
+    opt.getOrElse(sys.error(s"Window '$title' not found'"))
   }
 
   def findWindowComponent(title: String): Component = {
@@ -492,6 +545,21 @@ trait Tutorial {
     val pt = c.locationOnScreen
     val sz = c.size
     new Point(pt.x + sz.width - inset, pt.y + sz.height - inset)
+  }
+
+  def locTopRight(c: Component, inset: Int = 0): Point = {
+    onEDT()
+    val pt = c.locationOnScreen
+    val sz = c.size
+    new Point(pt.x + sz.width - inset, pt.y + inset)
+  }
+
+  def findTreeTable(parent: Component): Component = {
+    onEDT()
+    val res = findChild(parent.peer) {
+      case a: TreeTable => Component.wrap(a)
+    }
+    res.getOrElse(sys.error("Tree table not found"))
   }
 
   def findButton(parent: Component, text: String): Button = {
