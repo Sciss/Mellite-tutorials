@@ -181,6 +181,30 @@ object Tutorial1PaulStretch extends Tutorial {
         w
       }
       _ <- snapWindow(wCue, s"$assetPre-audio-file-view")
+      ggBoot <- onEDT {
+        mainFrame.visible = true
+        val b = findButton(windowComponent(mainFrame), "Boot")
+//        val pt = locBottomRight(b, inset = 8)
+        b.doClick()
+//        moveMouse(pt)
+//        clickMouse()
+        b
+      }
+      _ <- delay(2000)
+      _ <- onEDT {
+        val pt = locBottomRight(ggBoot, inset = 8)
+        //        b.doClick()
+        moveMouse(pt)
+        wCue.front()
+        typeKey(KeyEvent.VK_SPACE)
+      }
+      _ <- delay(200)
+      _ <- onEDT {
+        mainFrame.front()
+        wCue.visible = false
+      }
+      _ <- snapWindow(mainFrame, s"$assetPre-audio-system-booted")
+
     } yield ()
   }
 

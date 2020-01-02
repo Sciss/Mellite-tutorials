@@ -234,6 +234,8 @@ can usually remain on the default _<SC_HOME>_, but on Mac and Windows you must p
 `scynth` or `scsynth.exe` program. Once you manage to boot the audio system and press the play button in the
 audio file viewer, you should hear the playback and see the output meter moving in the main window:
 
+![Compilation Error in FScape Code Editor](.../tut-paulstretch-audio-system-booted.png)
+
 ----
 
 Let us now return to the FScape code editor. The transform consists of a "normalization", i.e. we apply the maximum 
