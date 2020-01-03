@@ -23,3 +23,7 @@ For taking the reproducible screenshots, I use the following settings:
 - jdk is 11
 - code font is 'Noto Mono' 15pt, no stretch, 110% line spacing
 - look and feel is Submin Light
+
+Converting DOT files
+
+- `dot -Tpng tut-paulstretch-diamond-problem.dot -o src/main/paradox/assets/images/tut-paulstretch-diamond-problem.png`

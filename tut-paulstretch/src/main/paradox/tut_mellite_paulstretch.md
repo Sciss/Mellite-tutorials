@@ -408,5 +408,58 @@ The creation of the entry for `"out"` is slightly different because this time th
 The object needed here is internally called _Artifact_, and in the Mellite user interface simply _File_. Let's
 create it directly within the attribute map editor for the FScape object. Click the plus button and from the popup
 menu select `Resources → File`. In the dialog you can either type the file path directly into the _Value_ text field,
-e.g. `/home/foo/Music/normalized.aif`, or press the ellipsis button `...` to select from a file chooser.
+e.g. `/home/foo/Documents/normalized.aif`, or press the ellipsis button `...` to select from a file chooser.
 After confirming, you need to give the key name, thus `out`.
+
+![Updated Attribute Map](.../tut-paulstretch-link-out-to-attr.png)
+
+If we now render the new program, we will see... _exactly nothing_. The `Render` button just remains disabled,
+the abort-rendering button with the x-shaped icon remains enabled. __The program is stuck.__ Unfortunately, in
+the current architecture it is quite easy to accidentally produce programs that hang, which is due to the fact
+that there are "diamond problems" in the code. A diamond problem happens when a UGen _A_ is used by two different
+signal branches _B_ and _C_, and then a UGen _D_ in turn uses both _B_ and _C_. This works only as long as branches
+_B_ and _C_ use the same processing throughput, but as soon as for example _B_ introduces a delay, we get into
+trouble. It is beyond this tutorial, but if you press the _Debug_ button and look at the DOT graph which is printed
+to the log window, you may spot this problem:
+
+![GraphViz plot of the Diamond Problem](.../tut-paulstretch-diamond-problem.png)
+
+Note that the duplicate inner branches show the automatic stereo expansion, but are not the cause of the problem.
+The two nodes of the diamond problem are `AudioFileIn` on one end, and the multiplication `BinaryOp` on the other
+end; in short, the line `val sig = in * gain` causes the hanging, because `gain` is only available
+_after the entire signal `in` has been read_---obviously, because we only know the maximum amplitude at the very
+end!---, but the multiplication would require that we can both scan `in` from the beginning and have `gain` available.
+This is technically impossible, unless there was some magical automatic buffering happening.
+
+@@@ note
+
+FScape is still considered experimental in many respects. One of the aspects that should be addressed in the
+future, is to at least automatically _detect_ these diamond problems and give the user help resolving them.
+As of now, the best you can do when you run into these problems, is to ask on the Gitter channel.
+
+@@@
+
+To fix this we could either:
+
+- Introduce an auxiliary buffer, `val sig = BufferDisk(in) * gain`. This creates an arbitrary long buffer for
+  the `in` signal by writing it to a temporary file.
+- Since the file is already on disk, we could just read it again: `val sig = AudioFileIn("in") * gain`. In the
+  DOT diagram above, the consequence would be that the blue 'shouldPull' lines down from the `BinaryOp(*)`s
+  are removed, as they are now connected to an independent duplicate of `AudioFileIn`.
+- A variant of the second idea is to change `val in` to `def in`, which means that whenever we refer to `in`,
+  we create a fresh `AudioFileIn` UGen.
+
+So the fixed program becomes
+
+```scala
+def in        = AudioFileIn("in")  // using def now!
+val chanMax   = RunningMax(in.abs).last
+val totalMax  = Reduce.max(chanMax)
+val gain      = 1.0 / totalMax
+val sig       = in * gain
+AudioFileOut("out", sig, sampleRate = in.sampleRate)
+```
+
+Now `in` is called three times, first when calculating the amplitude, next when calculating the
+normalized signal, and a third time when querying the sampling rate `in.sampleRate`. The last call is inexpensive,
+however, as it does not stream the whole signal but just retrieves the audio file header.

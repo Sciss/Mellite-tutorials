@@ -39,6 +39,8 @@ object Tutorial1PaulStretch extends Tutorial {
     w
   }
 
+  type S = Durable
+
   def started(): Future[Unit] = {
     for {
       _ <- delay()
@@ -214,9 +216,9 @@ object Tutorial1PaulStretch extends Tutorial {
           val fsc = f.head
 //          val cue = f.last
 //          fsc.attr.put("in", cue)
-          implicit val c  : stm.Cursor[Durable] = ws.cursor
-          implicit val _ws: Workspace [Durable] = ws
-          implicit val u  : Universe  [Durable] = Universe()
+          implicit val c  : stm.Cursor[S] = ws.cursor
+          implicit val _ws: Workspace [S] = ws
+          implicit val u  : Universe  [S] = Universe()
           AttrMapFrame(fsc)
         }
       }
@@ -276,6 +278,25 @@ object Tutorial1PaulStretch extends Tutorial {
         }
       }
       _ <- snapWindow(wAttr.window, s"$assetPre-link-in-to-attr")
+      _ <- onEDT {
+        ws.cursor.step { implicit tx =>
+          val f   = ws.root
+          val fsc = f.head
+          val cue = f.last.asInstanceOf[AudioCue.Obj.Apply[S]]
+          val loc = cue.artifact.location
+          val artOut = Artifact[S](loc, Artifact.Child("normalized.aif"))
+          fsc.attr.put("out", artOut)
+        }
+      }
+      _ <- onEDT {
+        val t = findTable(windowComponent(wAttr.window)).peer
+        val ptTgt = t.getLocationOnScreen
+        val rTgt  = t.getCellRect(3, 1, false)
+        val tgtX  = ptTgt.x + rTgt.x + rTgt.width/2
+        val tgtY  = ptTgt.y + rTgt.y + rTgt.height/2
+        moveMouse(tgtX, tgtY)
+      }
+      _ <- snapWindow(wAttr.window, s"$assetPre-link-out-to-attr")
     } yield ()
   }
 
