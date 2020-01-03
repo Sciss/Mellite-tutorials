@@ -14,6 +14,15 @@ by Paul:
 
 ![Original Paul Stretch Algorithm](.../paulstretch_steps.png)
 
+This tutorial is structured as follows:
+
+- First, we give a from-scratch introduction on how to get started in Mellite, how to create and populate a
+  workspace. If you are already familiar with these, you can skip this section.
+- Next, we'll run an example to understand how to compile and render FScape programs.
+- Then we learn how to import audio files into a workspace.
+- The fourth section develops an intuition about transforming an audio file with FScape
+- The fifth and last section actually implements the Paul-Stretch algorithm
+
 ## Creating a New Workspace
 
 Assuming that you have downloaded and launched Mellite, the first thing to do is create a new _workspace_.
@@ -51,7 +60,7 @@ over a traditional hard disk.
 The top element of a workspace is a so-called _Folder_. It is simply a list of elements, and you can nest folders
 inside folders to obtain a tree-like structure. You can think of a folder as a PD or Max patch, only that objects
 have no visual position within the patch but are just itemised as a list. Since we just created a new workspace,
-that list is initially empty. You can add new objects by clicking on the plus-shaped button and choosing
+that list is initially empty. You can add new objects by clicking on the button with plus-shaped icon and choosing
 from the popup menu _Composition → FScape_:
 
 ![Popup for New Object](.../tut-paulstretch-popup-folder-new-object.png)
@@ -63,8 +72,8 @@ dialog:
 ![Popup for New Object](.../tut-paulstretch-new-fscape-name.png)
 
 You now see a new object in the main workspace window. It is an empty program, in order to write our signal
-processing code, we have to select it with the mouse or cursor keys and click on the eye-shaped button to open its
-editor:
+processing code, we have to select it with the mouse or cursor keys and click on the button with the eye-shaped icon
+to open its editor:
 
 ![Popup for New Object](.../tut-paulstretch-fscape-in-folder.png)
 
@@ -207,7 +216,7 @@ to use them in Mellite.
 @@@
 
 The easiest way to get the input audio file, is to add it first to the main workspace folder, and from there
-make the connection to the attribute map. Therefore, go back to the main workspace window, press the plus-shaped
+make the connection to the attribute map. Therefore, go back to the main workspace window, press the plus
 button again, and this time select _Audio File_. A file chooser opens, navigate to the WAV file downloaded, select
 it and press _Open_. A second file chooser opens, prompting you:
 
@@ -220,7 +229,7 @@ added now to your workspace folder, the location and the audio file itself:
 
 ![Compilation Error in FScape Code Editor](.../tut-paulstretch-audio-file-in-folder.png)
 
-If you select the audio file and press the eye-shaped button, a viewer opens with the sonogram of the sound and
+If you select the audio file and press the eye button, a viewer opens with the sonogram of the sound and
 a transport bar to play back the sound:
 
 ![Compilation Error in FScape Code Editor](.../tut-paulstretch-audio-file-view.png)
@@ -251,7 +260,7 @@ val totalMax  = Reduce.max(chanMax)
 totalMax.poll("total-max")  // print the maximum input amplitude
 ```
 
-Before we can run the program, we must actually provide the input audio file location. Note how
+Before we can run the program, we must provide the input audio file location. Note how
 `AudioFileIn` uses a string parameter---`"in"`---to refer to this location.
 This is a __key__ into the __attribute map__ of the FScape object, where the actual file location will be
 looked up when running the program. This way, we avoid having to hard-code file paths in the program, and later
@@ -269,3 +278,135 @@ We can freely choose the key, but we must be careful that a corresponding entry 
 if we save and run (render) the above program, there will be an error:
 
 > java.lang.RuntimeException: AudioFileIn missing attribute in
+
+To create the necessary entry, we first open the attribute map of the FScape object. Go back to the main
+workspace window, select the FScape object in the list and click on button with the wrench-shaped icon to open
+the corresponding attribute map.
+
+@@@ note
+
+In Mellite, every object possesses an attribute map, as a way to specify its behaviour and make links between
+different objects. Some attributes have predefined meanings, for example `"name"` points to the given name of
+an object. Other attributes are defined by the user, with their keys being freely chosen.
+
+@@@
+
+We had already added the test audio file to the workspace, and now we need to associate it with the `"in"` key
+of the FScape attribute map: Press on the audio file entry in the main workspace window, keep the button pressed
+and move the mouse over the attribute map view, finding a position at the bottom of a row. You should see the
+mouse pointer change to a drag-and-drop pointer, and a thick line on the attribute map view indicates the drop
+position. Release the mouse button. A dialog pops up to specify the key name. Enter `in` and confirm. The new
+entry appears next to the existing entries for `name` and `graph-source` (this is where the source code of the
+FScape program is located!):
+
+![Drag-and-Drop of the Audio File onto the FScape Attribute Map](.../tut-paulstretch-dnd-to-attr.png)
+
+![Updated Attribute Map](.../tut-paulstretch-link-in-to-attr.png)
+
+@@@ note
+
+I am aware of the ergonomic challenge in this drag-and-drop operation.
+In the future, it is planned to make this association gesture easier, both in terms of mouse usage, but also
+adding keyboard equivalents. If you have any suggestions how to increase the usability, please let me know.
+
+@@@
+
+Now try clicking _Render_ again. The program should run, and output the individual channel amplitudes and the 
+overall amplitude to the log window:
+
+    chan-max: 0.26682332158088684
+    chan-max: 0.22031311690807343
+    total-max: 0.26682332158088684
+
+Let's analyse the code in more depth:
+
+```scala
+val in        = AudioFileIn("in")
+val chanMax   = RunningMax(in.abs).last
+chanMax .poll("chan-max")   // print the amplitude of each channel
+val totalMax  = Reduce.max(chanMax)
+totalMax.poll("total-max")  // print the maximum input amplitude
+```
+
+The first UGen should be clear now---it reads in an audio file by looking at the entry with key `"in"` in the 
+containing object's attribute map, expecting to find an audio file object there. The second line is actually
+comprised of three UGens: `in.abs` creates a `UnaryOp` UGen which operates on a sample-by-sample level, applying
+a particular operator, here the `abs` function that takes away the sign of each sample value, so an input sequence
+of `-0.1, 0.3, 0.5, -0.4` would become `0.1, 0.3, 0.5, 0.4`. This is because we are looking for the largest
+sample value to either side of the oscillation, above zero or below zero. The absolute values are then fed into
+the `RunningMax` UGen, which simply remembers the largest value it has ever seen up and until any moment in time,
+so if the input sequence was `0.1, 0.3, 0.5, 0.4`, it would output `0.1, 0.3, 0.5, 0.5`.
+
+The result of this fed into `.last` which is shorthand for `.takeRight(1)`. The `TakeRight` UGen drops all input 
+sample values except for the last ones. This is an important difference to the real-time signal processing in
+SuperCollider, for example. In FScape, signals can have finite durations, and UGens do not have to output the
+same number of values as they take as their inputs. It is easier to view signals in FScape as if they were
+collection of numbers, on which one can perform typical collection operations such as truncating the sequence,
+sorting or reversing it, etc. This has some consequences for the design of programs to avoid that the signal flow
+"gets stuck", as we shall see soon.
+
+In short, the second line computes that maximum absolute value of the input signal. The third line calls the `.poll`
+function which produces as a `Poll` UGen that prints values from its input signals to the post window. As we
+do not specify a frequency of polling, it only prints a single time, that is the first value of the input signal.
+The string argument `"chan-max"` is a label, so that we can distinguish the output of multiple `Poll` instances.
+Because `chanMax` has already been truncated to a single value---the last element of the `RunningMax` UGen---we
+effectively print out the maximum amplitude across the entire input audio file.
+ 
+But there is more to it as you can see from the output: With the given test audio file, we see two values printed,
+`0.2668` and `0.2203`. This is because in FScape, signals can be comprised of more than one channel. In fact,
+FScape uses the same principle of __multi-channel expansion__ as SuperCollider. Internally, whenever a signal contains
+more than one channel, the signal process just passes each channel through its own copy of the UGens in the program,
+so in our case there will be two `.abs` UGens, two `RunningMax` UGens, two `.last` UGens, and two `.poll("chanMax")`
+UGens!
+
+When normalizing an audio file, we usually want to adjust the gain of all channels by the same value, otherwise we
+would alter the spatial balance between the channels. We therefore need a way to ensure that a multi-channel signal
+is reduced to a single-channel signal. This is precisely what the `Reduce` UGen does. It comes in several variants,
+such as `Reduce.+`, `Reduce.min`, `Reduce.max`, specifying how values across channels are combined. As you can see,
+`Reduce.max` took the maximum of the two channels `0.2668` and `0.2203`, and output a single value `0.2668`---the
+higher of the two amplitudes.
+
+----
+
+Now that we know the maximum amplitude, we can complete the program by calculating the normalising gain factor and
+writing the output audio file:
+
+```scala
+val in        = AudioFileIn("in")
+val chanMax   = RunningMax(in.abs).last
+val totalMax  = Reduce.max(chanMax)
+val gain      = 1.0 / totalMax
+val sig       = in * gain
+AudioFileOut("out", sig, sampleRate = in.sampleRate)
+```
+
+The gain factor is simply the reciprocal of the maximum amplitude found in the input. So `1.0 / 0.2668` is 
+`3.7477`, and if all input sample values are multiplied by that factor, the maximum output amplitude is thus
+`0.2668 * 3.7477 = 1.0`. You can also see that we can multiple a multi-channel signal (`in`) with a single-channel
+signal (`gain`). Again, this works like multi-channel-expansion in SuperCollider: The result will have the maximum
+number of channel found (here two), and in the `BinaryOp`---the UGen produced by the `*` operator---the first
+and only channel of `gain` is used for both channels of `in`. Finally, writing the output file looks similar to
+reading the input file; we specify again a key, now `"out"`, for the UGen to look up the file reference in the 
+attribute map; the second argument is the signal to be written, and there are additional arguments for the 
+audio file format, which we left at the default (the file will have AIFF format and 32-bit floating point sample
+resolution) except for the `sampleRate`. We use `in.sampleRate` to make the output
+file match the input file's sampling rate.
+
+@@@ note { title=Scala }
+
+You can see all arguments to `AudioFileOut` by searching for this symbol in the API documentation browser
+(menu _Help → API Documentation_). From the alternatives choose package `de.sciss.fscape.lucre.graph`. In Scala,
+methods and class constructors can use default arguments, and here they are given for `fileType`, `sampleFormat`,
+and `sampleRate`. To skip parameters in the use site, we can name the arguments, such as `sampleRate = ...` which
+means that the first two argument values, `"out"` and `sig`, are aligned with the first two arguments of the class,
+`key` and `in`, and then we "jump" to the fifth argument `sampleRate`. It is good style to use named arguments
+also in cases where you do not jump across arguments but just want to make clear which argument is which.
+
+@@@
+
+The creation of the entry for `"out"` is slightly different because this time the audio file does not exist yet.
+The object needed here is internally called _Artifact_, and in the Mellite user interface simply _File_. Let's
+create it directly within the attribute map editor for the FScape object. Click the plus button and from the popup
+menu select `Resources → File`. In the dialog you can either type the file path directly into the _Value_ text field,
+e.g. `/home/foo/Music/normalized.aif`, or press the ellipsis button `...` to select from a file chooser.
+After confirming, you need to give the key name, thus `out`.

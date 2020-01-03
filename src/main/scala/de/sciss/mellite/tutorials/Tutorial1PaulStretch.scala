@@ -6,11 +6,12 @@ import java.util.concurrent.TimeUnit
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr.{DoubleObj, LongObj}
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.mellite.{ActionOpenWorkspace, Mellite, Prefs}
+import de.sciss.mellite.{ActionOpenWorkspace, AttrMapFrame, Mellite, Prefs}
 import de.sciss.synth.io.AudioFile
 import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.{AudioCue, Workspace}
+import de.sciss.synth.proc.{AudioCue, Durable, Universe, Workspace}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -158,13 +159,14 @@ object Tutorial1PaulStretch extends Tutorial {
         closeWindowComponent("plot")
       }
       _ <- delay()
-      _ <- onEDT {
+      ttRoot <- onEDT {
         val tt = findTreeTable(windowComponent(wWorkspace))
         tt.requestFocus()
 //        typeKey(KeyEvent.VK_TAB)
 //        typeModKey(KeyEvent.VK_SHIFT, KeyEvent.VK_TAB)
         typeKey(KeyEvent.VK_DOWN)
         typeKey(KeyEvent.VK_DOWN)
+        tt
       }
       _ <- snapWindow(wWorkspace, s"$assetPre-audio-file-in-folder")
       _ <- onEDT {
@@ -204,7 +206,76 @@ object Tutorial1PaulStretch extends Tutorial {
         wCue.visible = false
       }
       _ <- snapWindow(mainFrame, s"$assetPre-audio-system-booted")
+      wAttr <- onEDT {
+        wWorkspace.front()
+        mainFrame.visible = false
+        ws.cursor.step { implicit tx =>
+          val f   = ws.root
+          val fsc = f.head
+//          val cue = f.last
+//          fsc.attr.put("in", cue)
+          implicit val c  : stm.Cursor[Durable] = ws.cursor
+          implicit val _ws: Workspace [Durable] = ws
+          implicit val u  : Universe  [Durable] = Universe()
+          AttrMapFrame(fsc)
+        }
+      }
+      _ <- onEDT {
+        val pt = wAttr.window.location
+        val sz = wAttr.window.size
+        val locWs = wWorkspace.location
+        val szWs = wWorkspace.size
+        pt.y = locWs.y + szWs.height + 4
+        pt.x = locWs.x + (wWorkspace.size.width - sz.width) / 2
+        wAttr.window.location = pt
+      }
+      _ <- delay()
+      (linkSrcX, linkSrcY, linkTgtX, linkTgtY) <- onEDT {
+        val t = findTable(windowComponent(wAttr.window)).peer
+//        val tcm = t.peer.getColumnModel
+        val ptTgt = t.getLocationOnScreen
+//        val cx  = pt0.x + tcm.getColumn(0).getWidth + tcm.getColumn(1).getWidth/2
+        val rTgt  = t.getCellRect(1, 1, false)
+        val tgtX  = ptTgt.x + rTgt.x + rTgt.width/2
+        val tgtY  = ptTgt.y + rTgt.y + rTgt.height - 2 // /2
+        val tt    = ttRoot.peer
+        val ptSrc = tt.getLocationOnScreen
+        val rSrc  = tt.getCellRect(2, 0, false)
+        val srcX  = ptSrc.x + rSrc.x + rSrc.width/2
+        val srcY  = ptSrc.y + rSrc.y + rSrc.height/2
 
+        moveMouse(srcX, srcY)
+        pressMouse()
+
+        (srcX, srcY, tgtX, tgtY)
+      }
+      _ <- delay(100)
+      _ <- onEDT(moveMouse(linkTgtX, linkTgtY - 4))
+      _ <- delay(250)
+//      _ <- onEDT(pressMouse())
+//      _ <- delay(250)
+      _ <- onEDT {
+        moveMouse(linkTgtX, linkTgtY)
+      }
+      _ <- snapWindow(wAttr.window, s"$assetPre-dnd-to-attr", pointer = false, code = { g2 =>
+        drawArrow(g2, linkSrcX, linkSrcY, linkTgtX, linkTgtY)
+//        g2.drawLine(linkTgtX - 4, linkTgtY, linkTgtX + 4, linkTgtY)
+//        g2.drawLine(linkTgtX, linkTgtY - 4, linkTgtX, linkTgtY + 4)
+      })
+      _ <- onEDT {
+        typeKey(KeyEvent.VK_ESCAPE) // just to be sure; seems that drop doesn't work
+        releaseMouse()
+      }
+      _ <- onEDT {
+        wWorkspace.visible = false
+        ws.cursor.step { implicit tx =>
+          val f   = ws.root
+          val fsc = f.head
+          val cue = f.last
+          fsc.attr.put("in", cue)
+        }
+      }
+      _ <- snapWindow(wAttr.window, s"$assetPre-link-in-to-attr")
     } yield ()
   }
 

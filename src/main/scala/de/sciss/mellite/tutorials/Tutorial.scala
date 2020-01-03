@@ -1,20 +1,22 @@
 package de.sciss.mellite.tutorials
 
 import java.awt.event.{ActionListener, ComponentAdapter, ComponentEvent, ComponentListener, HierarchyEvent, HierarchyListener, InputEvent}
+import java.awt.geom.{AffineTransform, GeneralPath}
 import java.awt.image.BufferedImage
-import java.awt.{Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Image, MouseInfo, Point, Rectangle, Robot}
+import java.awt.{BasicStroke, Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Image, MouseInfo, Point, Rectangle, RenderingHints, Robot}
 
 import de.sciss.desktop.Window
 import de.sciss.file._
 import de.sciss.mellite.{LogFrame, MainFrame, Mellite}
-import de.sciss.treetable.j.TreeTable
+import de.sciss.treetable.{TreeColumnModel, TreeTable}
+import de.sciss.treetable.j.{TreeTable => JTreeTable}
 import javax.imageio.ImageIO
 import javax.swing.event.{ChangeEvent, ChangeListener}
-import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JWindow, MenuElement, Timer}
+import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JTable, JWindow, MenuElement, Timer}
 
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.swing.{Button, Component, Swing, TextField, UIElement}
+import scala.swing.{Button, Component, Graphics2D, Swing, Table, TextField, UIElement}
 import scala.util.control.NonFatal
 
 trait Tutorial {
@@ -296,7 +298,7 @@ trait Tutorial {
   }
 
   private def selectPopupMenuEDT(m0: JPopupMenu, path0: String, path: String*): Future[Unit] = try {
-    loopShowMenu(Future.successful(), m0, path0 :: path.toList)
+    loopShowMenu(Future.successful(()), m0, path0 :: path.toList)
 
   } catch {
     case NonFatal(ex) =>
@@ -379,14 +381,15 @@ trait Tutorial {
     res.future
   }
 
-  def snapWindow(w: => Window, name: String, pointer: Boolean = true): Future[Unit] =
+  def snapWindow(w: => Window, name: String, pointer: Boolean = true, code: Graphics2D => Unit = null): Future[Unit] =
     delay(repaintDelay).flatMap( _ =>
-      ensureFlatEDT(snapComponentEDT(w.component, name, pointer = pointer))
+      ensureFlatEDT(snapComponentEDT(w.component, name, pointer = pointer, code = code))
     )
 
-  def snapComponent(c: => Component, name: String, pointer: Boolean = true): Future[Unit] =
+  def snapComponent(c: => Component, name: String, pointer: Boolean = true,
+                    code: Graphics2D => Unit = null): Future[Unit] =
     delay(repaintDelay).flatMap( _ =>
-      ensureFlatEDT(snapComponentEDT(c, name, pointer = pointer))
+      ensureFlatEDT(snapComponentEDT(c, name, pointer = pointer, code = code))
     )
 
   private[this] lazy val pointerImg: Image = {
@@ -396,15 +399,21 @@ trait Tutorial {
     // Toolkit.getDefaultToolkit.createImage(url)
   }
 
-  private def snapComponentEDT(c: UIElement, name: String, pointer: Boolean): Future[Unit] = try {
+  private def snapComponentEDT(c: UIElement, name: String, pointer: Boolean,
+                               code: Graphics2D => Unit): Future[Unit] = try {
     requireEDT()
     val img = robot.createScreenCapture(graphicsConfiguration.getBounds)
-    if (pointer) {
-      val pi = MouseInfo.getPointerInfo
-      val pm = pi.getLocation
+    if (pointer || code != null) {
       val gImg = img.createGraphics()
-//      println(s"pointerImg = $pointerImg")
-      gImg.drawImage(pointerImg, pm.x - 1, pm.y - 1, null)  // hot-spot: (1, 1)
+      if (code != null) {
+        gImg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        code(gImg)
+      }
+      if (pointer) {
+        val pi = MouseInfo.getPointerInfo
+        val pm = pi.getLocation
+        gImg.drawImage(pointerImg, pm.x - 1, pm.y - 1, null)  // hot-spot: (1, 1)
+      }
       gImg.dispose()
     }
 
@@ -516,7 +525,7 @@ trait Tutorial {
   }
 
   def findWindow(title: String): Window = {
-    onEDT()
+    requireEDT()
     val opt = Mellite.windowHandler.windows.find(_.title == title)
     val w = opt.getOrElse(sys.error(s"Window '$title' not found'"))
     w
@@ -531,7 +540,7 @@ trait Tutorial {
   }
 
   def findWindowComponent(title: String): Component = {
-    onEDT()
+    requireEDT()
     val opt = java.awt.Window.getWindows.collectFirst {
       case f: JFrame  if f.getTitle == title => f.getRootPane
       case d: JDialog if d.getTitle == title => d.getRootPane
@@ -541,29 +550,69 @@ trait Tutorial {
   }
 
   def locBottomRight(c: Component, inset: Int = 0): Point = {
-    onEDT()
+    requireEDT()
     val pt = c.locationOnScreen
     val sz = c.size
     new Point(pt.x + sz.width - inset, pt.y + sz.height - inset)
   }
 
   def locTopRight(c: Component, inset: Int = 0): Point = {
-    onEDT()
+    requireEDT()
     val pt = c.locationOnScreen
     val sz = c.size
     new Point(pt.x + sz.width - inset, pt.y + inset)
   }
 
-  def findTreeTable(parent: Component): Component = {
-    onEDT()
+  def findTable(parent: Component): Table = {
+    requireEDT()
     val res = findChild(parent.peer) {
-      case a: TreeTable => Component.wrap(a)
+      case a: JTable =>
+        new Table {
+          override lazy val peer: JTable = a
+        }
+
+    }
+    res.getOrElse(sys.error("Table not found"))
+  }
+
+  def findTreeTable(parent: Component): TreeTable[Any, TreeColumnModel[Any]] = {
+    requireEDT()
+    val res = findChild(parent.peer) {
+      case a: JTreeTable =>
+          new TreeTable[Any, TreeColumnModel[Any]](null, null) {
+            override lazy val peer: JTreeTable = a
+          }
+//        Component.wrap(a)
+
     }
     res.getOrElse(sys.error("Tree table not found"))
   }
 
+  def drawArrow(g2: Graphics2D, x1: Int, y1: Int, x2: Int, y2: Int, color: Color = Color.blue): Unit = {
+    g2.setColor(color)
+    val strkOrig  = g2.getStroke
+    val pntOrig   = g2.getPaint
+    g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_MITER, 10f, Array[Float](4f, 4f), 0f))
+
+    g2.fillOval(x1 - 1, y1 - 2, 3, 3)
+    g2.drawLine(x1, y1, x2, y2)
+    val p = new GeneralPath()
+    val rad = math.atan2(y2 - y1, x2 - x1)
+    p.moveTo(1f, 0f)
+    p.lineTo(-8, -6)
+    p.lineTo(-8, 6)
+    p.closePath()
+    //      val at = AffineTransform.getRotateInstance( rad )
+    //      at.translate( x2, y2 )
+    val at = AffineTransform.getTranslateInstance(x2, y2)
+    at.rotate(rad)
+    g2.fill(p.createTransformedShape(at))
+    g2.setStroke(strkOrig)
+    g2.setPaint (pntOrig)
+  }
+
   def findButton(parent: Component, text: String): Button = {
-    onEDT()
+    requireEDT()
     val res = findChild(parent.peer) {
       case a: javax.swing.JButton if a.getText == text =>
         new scala.swing.Button {
@@ -574,7 +623,7 @@ trait Tutorial {
   }
 
   def findButtonByTT(parent: Component, tt: String): Button = {
-    onEDT()
+    requireEDT()
     val res = findChild(parent.peer) {
       case a: javax.swing.JButton if a.getToolTipText == tt =>
         new scala.swing.Button {
@@ -585,7 +634,7 @@ trait Tutorial {
   }
 
   def findTextField(parent: Component, text: String): TextField = {
-    onEDT()
+    requireEDT()
     val res = findChild(parent.peer) {
       case a: javax.swing.JTextField if a.getText == text =>
         new scala.swing.TextField {
@@ -596,7 +645,7 @@ trait Tutorial {
   }
 
   def findFileChooser(parent: Component): scala.swing.FileChooser = {
-    onEDT()
+    requireEDT()
     val res = findChild(parent.peer) {
       case a: javax.swing.JFileChooser =>
         new scala.swing.FileChooser { override lazy val peer: javax.swing.JFileChooser = a }
