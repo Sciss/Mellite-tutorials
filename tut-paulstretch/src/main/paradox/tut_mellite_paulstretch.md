@@ -12,7 +12,7 @@ the phase information, resynthesising the time domains segments and putting them
 operation, using a larger stepping size than in the analysis. This is illustrated in the following diagram provided 
 by Paul:
 
-![Original Paul Stretch Algorithm](.../paulstretch_steps.png)
+![Original Paul Stretch Algorithm](.../tut-paulstretch-steps.png)
 
 This tutorial is structured as follows:
 
@@ -20,8 +20,9 @@ This tutorial is structured as follows:
   workspace. If you are already familiar with these, you can skip this section.
 - Next, we'll run an example to understand how to compile and render FScape programs.
 - Then we learn how to import audio files into a workspace.
-- The fourth section develops an intuition about transforming an audio file with FScape
-- The fifth and last section actually implements the Paul-Stretch algorithm
+- The fourth section develops an intuition about transforming an audio file with FScape.
+- The fifth and last section actually implements the Paul-Stretch algorithm.
+- At the end, you find a download link for a ready-to-use workspace.
 
 ## Creating a New Workspace
 
@@ -61,18 +62,18 @@ The window you see now is called the __workspace root window__. It represents th
 a so-called _Folder_. A folder is simply a list of elements, and you can nest folders
 inside folders to obtain a tree-like structure. You can think of a folder as a PD or Max patch, only that objects
 have no visual position within the patch but are just itemised as a list. Since we just created a new workspace,
-that list is initially empty. You can add new objects by clicking on the button with plus-shaped icon and choosing
+that list is still empty. Add a new object by clicking on the button with plus-shaped icon and choosing
 from the popup menu _Composition → FScape_:
 
 ![Popup for New Object](.../tut-paulstretch-popup-folder-new-object.png)
 
-This is followed by prompting a name for the new object. This is like naming a variable---since you may have multiple
+A prompt for a name for the new object will be shown. This is like naming a variable---since you may have multiple
 _FScape_ programs, you distinguish them by name. Let's just use the default name "FScape" for now, and confirm the
 dialog:
  
 ![Prompt for New Object Name](.../tut-paulstretch-new-fscape-name.png)
 
-You now see a new object in the workspace root window. It is an empty program, in order to write our signal
+You now see a new object in the workspace root window. It is an empty program, and in order to write our signal
 processing code, we have to select it with the mouse or cursor keys and click on the button with the eye-shaped icon
 to open its editor:
 
@@ -123,15 +124,16 @@ names for variables, beginning with a lower-case character.
 @@@
 
 Since FScape calculates "as fast as possible" without being tied to real-time sound output, there is no given
-@link:[sampling rate](https://en.wikipedia.org/wiki/Sampling_(signal_processing)#Sampling_rate), the number of digital
-samples per second in the sound signal. If a program generates sound
-"from scratch", you would normally define a suitable sampling rate, or if a program transforms an input sound file,
-you would normally use that sound file's existing sampling rate. Common sampling rates are 44.1 kHz (44100 Hz) and
-48 kHz (48000 Hz). The first line, `val sr = 44100.0` defines a variable for the sampling rate that we can then use
+@link:[sampling rate](https://en.wikipedia.org/wiki/Sampling_%28signal_processing%29#Sampling_rate) { open=new },
+the number of digital samples per second in the sound signal. If a program generates sound
+"from scratch", you would normally define a suitable sampling rate, or if a program transforms an input audio file,
+you would normally use that audio file's existing sampling rate. Common sampling rates are 44.1 kHz (44100 Hz) and
+48 kHz (48000 Hz). The first line `val sr = 44100.0` defines a variable for the sampling rate that we can then use
 subsequently.
 
 The second line `val sig = SinOsc(440 / sr)` creates a so-called
-@link:[unit generator](https://en.wikipedia.org/wiki/Unit_generator) (UGen), in this case a sine oscillator. Whereas in
+@link:[unit generator](https://en.wikipedia.org/wiki/Unit_generator) { open=new } (UGen), in this case a sine 
+oscillator. Whereas in
 real-time systems, you typically specify its frequency in Hertz, for example using `[osc~ 440]` in PD, `[cycle~ 440]`
 in Max, or `SinOsc.ar(440)` in SuperCollider, in FScape you give the __normalized frequency__, which means that you
 divide the nominal frequency in Hertz by the sampling rate---precisely, because FScape does not know what the
@@ -149,7 +151,7 @@ of the program. In the future, visualisations will be much better integrated int
 
 To _run_ this program, we need to understand the buttons at the bottom of the editor window, namely
 _Apply_, _Compile_, and _Render_. Code snippets in Mellite exists always in two forms:
-__Source code__ and __compiled program__ (Scala is a compiled language). Furthermore, when you edit code in the text
+__Source code__ and __compiled graph__. Furthermore, when you edit code in the text
 editor, the changes only exist in a temporary __buffer__ and have to be explicitly applied, as if the updated source 
 code was "saved". Thus if you tried to close the editor window now, you would see a dialog warning you that you have
 "unsaved" changes. The _Compile_ button can be used to __test__ whether the current buffer (editor content) is a
@@ -168,7 +170,7 @@ The error reads something like
 > error: not enough arguments for method apply: (in: GE, size: GE, label: String)Plot1D in object Plot1D
 
 We can undo the last edit using <kbd>ctrl</kbd>-<kbd>Z</kbd> (Mac: <kbd>cmd</kbd>-<kbd>Z</kbd>).
-If the program is valid, we can save both source code and the compiled program by clicking on the _Apply_ button.
+If the program is valid, we can save both source code and the compiled graph by clicking on the _Apply_ button.
 When this button is disabled (shown in faint colours), it means the current buffer has been saved.
 
 @@@ warning {title=Bug }
@@ -181,12 +183,12 @@ Sometimes the _Apply_ button is not shown disabled even after saving.
 
 It is currently not possible to save just the source code if the program is invalid. This will be fixed in a future
 version. As a work-around, you can place a block comment `/* ... */` around your code to be able to save and exit
-the editor while your program is still invalid (the compiled program will be empty in this case).
+the editor while your program is still invalid (the compiled graph will be empty in this case).
 
 @@@
 
 Finally, to run the program, we press the _Render_ button. It is important to understand that this will run the
-__last saved compiled program__, so if you forgot to save you might be actually running a previously
+__last saved compiled graph__, so if you forgot to save you might be actually running a previously
 saved version, not the one corresponding to the current buffer! The output should be the plot window showing the
 first 500 sample values of the sine oscillator:
 
@@ -210,7 +212,7 @@ to obtain a local copy of this sound. Note that the file format is uncompressed 
 
 @@@ note
 
-While Mellite can export compressed formats such as mp3 or FLAC, it currently only handles uncompressed or 'PCM'
+While Mellite can export compressed formats such as mp3, it currently only handles uncompressed or "PCM"
 formats as input, typically AIFF or WAV files. If you have mp3, FLAC or Ogg files, you must convert them to be able
 to use them in Mellite.
 
@@ -270,7 +272,7 @@ we can link this key to a user interface component as well.
 @@@ note { title=Scala }
 
 String literals in Scala have to be enclosed in double quotes `"..."`, just as in Java or SuperCollider.
-Anther similarity are line comments which begin with double forward slashes `// ...`. Comments are purely
+Another similarity are line comments which begin with double forward slashes `// ...`. Comments are purely
 informative to the reader, they are ignored by the compiler.
 
 @@@
@@ -281,8 +283,8 @@ if we save and run (render) the above program, there will be an error:
 > java.lang.RuntimeException: AudioFileIn missing attribute in
 
 To create the necessary entry, we first open the attribute map of the FScape object. Go back to the
-workspace root window, select the FScape object in the list and click on button with the wrench-shaped icon to open
-the corresponding attribute map.
+workspace root window, select the FScape object in the list and click on the button with the wrench-shaped icon to
+open the corresponding attribute map.
 
 @@@ note
 
@@ -298,7 +300,7 @@ and move the mouse over the attribute map view, finding a position at the bottom
 mouse pointer change to a drag-and-drop pointer, and a thick line on the attribute map view indicates the drop
 position. Release the mouse button. A dialog pops up to specify the key name. Enter `in` and confirm. The new
 entry appears next to the existing entries for `name` and `graph-source` (this is where the source code of the
-FScape program is located!):
+FScape program is located):
 
 ![Drag-and-Drop of the Audio File onto the FScape Attribute Map](.../tut-paulstretch-dnd-to-attr.png)
 
@@ -342,7 +344,7 @@ The result of this fed into `.last` which is shorthand for `.takeRight(1)`. The 
 sample values except for the last ones. This is an important difference to the real-time signal processing in
 SuperCollider, for example. In FScape, signals can have finite durations, and UGens do not have to output the
 same number of values as they take as their inputs. It is easier to view signals in FScape as if they were
-collection of numbers, on which one can perform typical collection operations such as truncating the sequence,
+collections of numbers, on which one can perform typical collection operations such as truncating the sequence,
 sorting or reversing it, etc. This has some consequences for the design of programs to avoid that the signal flow
 "gets stuck", as we shall see soon.
 
@@ -383,7 +385,7 @@ AudioFileOut("out", sig, sampleRate = in.sampleRate)
 
 The gain factor is simply the reciprocal of the maximum amplitude found in the input. So `1.0 / 0.2668 ≈ 3.7477`, 
 and if all input sample values are multiplied by that factor, the maximum output amplitude is thus
-`0.2668 * 3.7477 ≈ 1.0`. You can also see that we can multiple a multi-channel signal (`in`) with a single-channel
+`0.2668 * 3.7477 ≈ 1.0`. You can also see that we can multiply a multi-channel signal (`in`) with a single-channel
 signal (`gain`). Again, this works like multi-channel-expansion in SuperCollider: The result will have the maximum
 number of channel found (here two), and in the `BinaryOp`---the UGen produced by the `*` operator---the first
 and only channel of `gain` is used for both channels of `in`. Finally, writing the output file looks similar to
@@ -429,8 +431,8 @@ Note that the duplicate inner branches show the automatic stereo expansion, but 
 The two nodes of the diamond problem are `AudioFileIn` on one end, and the multiplication `BinaryOp` on the other
 end; in short, the line `val sig = in * gain` causes the hanging, because `gain` is only available
 _after the entire signal `in` has been read_---obviously, because we only know the maximum amplitude at the very
-end!---, but the multiplication would require that we can both scan `in` from the beginning and have `gain` available.
-This is technically impossible, unless there was some magical automatic buffering happening.
+end!---but the multiplication would require that we can both scan `in` from the beginning _and_ have `gain`
+immediately available. This is technically impossible, unless there was some magical automatic buffering happening.
 
 @@@ note
 
@@ -445,7 +447,7 @@ To fix this we could either:
 - Introduce an auxiliary buffer, `val sig = BufferDisk(in) * gain`. This creates an arbitrary long buffer for
   the `in` signal by writing it to a temporary file.
 - Since the file is already on disk, we could just read it again: `val sig = AudioFileIn("in") * gain`. In the
-  DOT diagram above, the consequence would be that the blue 'shouldPull' lines down from the `BinaryOp(*)`s
+  DOT diagram above, the consequence would be that the blue "shouldPull" lines down from the `BinaryOp(*)`s
   are removed, as they are now connected to an independent duplicate of `AudioFileIn`.
 - A variant of the second idea is to change `val in` to `def in`, which means that whenever we refer to `in`,
   we create a fresh `AudioFileIn` UGen.
@@ -467,7 +469,7 @@ however, as it does not stream the whole signal but just retrieves the audio fil
 
 @@@ note { title=Scala }
 
-While a `val a = b` means that the right-hand-side expression `b` is evaluated once and the result assigned to `a`,
+While `val a = b` means that the right-hand-side expression `b` is evaluated _once_ and the result assigned to `a`,
 the method definition `def a = b` means that _whenever_ we refer to `a`, the expression `b` is evaluated anew.
 If `b` is a constant, there is no difference between `val a` and `def a`, however in FScape, expressions
 such as `AudioFileIn(...)` place the UGen in the signal graph, so if we evaluate that expression twice, we actually
@@ -477,7 +479,7 @@ create two independent instances of the UGen.
 
 ## PaulStretch in FScape
 
-After this long haul, I want to dump the entire program first---before taking it apart and explaining the 
+After this long haul, let's look at the entire program first---before taking it apart and explaining the 
 steps---so you can already experiment with it and render an actual sound:
 
 ```scala
@@ -520,9 +522,9 @@ If you run this with the example bell audio file, the result should sound like t
   <source src="bell-stretched.mp3" type="audio/wav">
 </audio>
 
-Now the explanations. For a better understanding, refer back to the diagrammatic algorithm scheme at the beginning
+For a better understanding, refer back to the diagrammatic algorithm scheme at the beginning
 of the tutorial---it more or less directly translates into this code. First, we select the two crucial parameters,
-the window size in seconds, `winSizeSec` and the `stretch` factor. We can convert durations in seconds into durations
+the window size in seconds, `winSizeSec`, and the `stretch` factor. We can convert durations in seconds into durations
 in sample-frames---the unit that most UGens will work with---by multiplying with the sampling rate:
 `val winSize = (winSizeSec * sr).roundTo(1).max(1)`. The last two operations ensure that we end up with an integer
 number of sample-frames, and irrespective of the parameters chosen, the window size will never be smaller than one.
@@ -546,7 +548,7 @@ step (overlap-add) is 4 or 75% (the stepping size is 1/4 of the window size). Mo
 given by `val stepSizeOut = (winSize / N).roundTo(1).max(1)`. In order to obtain the stretching
 effect, we now use a much smaller stepping size in the analysis phase: 
 `val stepSizeIn = (winSize / (N * stretch)).roundTo(1).max(1)`. So with `N = 4` and `stretch = 8.0`,
-each step in analysis stage is 1/32 of the window size. The following image illustrates the process:
+each step in the analysis stage is 1/32 of the window size. The following image illustrates the process:
 
 ![Stretching of the Window Stepping](.../tut-paulstretch-window-stretching.png)
 
@@ -555,8 +557,8 @@ follows another---and the synthesis uses the `OverlapAdd` UGen which takes the s
 sums them.
 
 If `numFramesIn = in.numFrames` is the number of sample-frames
-in the input audio file, we obtain the number of windows by dividing it by the step size and rounding up to the next
-integer number (`.ceil`): `val numStepsIn = (numFramesIn / stepSizeIn).ceil`. And consequently the output will
+in the input audio file, we obtain the number of windows by dividing it by the step size and rounding up (`.ceil`)
+to the next integer number: `val numStepsIn = (numFramesIn / stepSizeIn).ceil`. And consequently the output will
 consist of `numStepsIn - 1` partial (overlapping) segments of `stepSizeOut` and a final full window of `winSize`:
 `val numFramesOut= (numStepsIn - 1).max(0) * stepSizeOut + winSize`. We need to calculate this length because we
 use infinitely long generator UGens, such as the window function generator `GenWindow`, and at some point we have to
@@ -564,7 +566,7 @@ truncate the process, otherwise it would render without stopping; this happens t
 `lap.take(numFramesOut)`.
 
 What happens between `Sliding` and `OverlapAdd`? First of all, the windows are multiplied by a
-@link:[window function](https://en.wikipedia.org/wiki/Window_function)
+@link:[window function](https://en.wikipedia.org/wiki/Window_function) { open=new }
 that produces a fade-in and fade-out for each window:
 
 ```scala
@@ -609,7 +611,7 @@ forward transform (time to frequency) or inverse transform (frequency to time). 
 noise, a forward FFT followed by an inverse FFT reconstructs the original signal. In FScape, the forward transform is
 `Real1FFT`, and the inverse transform is `Real1IFFT`. "Real" means that the time domain signal is
 @link:[real](https://en.wikipedia.org/wiki/Real_number) { open=new } as opposed to the frequency domain signal which is
-@link:[complex](https://en.wikipedia.org/wiki/Complex_number) { open=new }. The `1` in `Real1FFT` indicates that the
+@link:[complex](https://en.wikipedia.org/wiki/Complex_number) { open=new }. The "1" in `Real1FFT` indicates that the
 transform is applied to a one-dimensional signal, such as sound. There is also a variant for two-dimensional signals
 which is useful for matrices and images.
 
@@ -630,7 +632,7 @@ val fft         = Real1FFT(inPad, fftSize)
 In the frequency domain, we want to preserve the magnitudes of the frequency bins, while replacing the phases
 with random values. Currently, FScape does not have a dedicated data type for complex signals, so it represents
 complex signals as ordinary sequences of floating-point numbers where real and imaginary parts of the complex
-numbers are interleaved. Always two subsequent "real" values thus represent actually one complex value. To help
+numbers are _interleaved_. Always two subsequent "real" values thus represent actually one complex value. To help
 with this situation, we can activate pseudo complex number operations by writing `.complex`. In this case,
 `.complex.mag` takes the input signal, treats it as if it was complex, grouping always pairs of values as
 real/imaginary components, then calculating the magnitudes of these values
@@ -668,22 +670,22 @@ For binary mathematical operations, we normally use the infix syntax which feels
 All the effort of adding audio files and artifacts to the workspace must be good for something, or else we could
 just have hard-coded the input and output paths in the program. As stated before, the attribute map is Mellite's
 way of allowing different objects to be interacting with each other. Now that we have the full stretching algorithm
-implemented, it would be nice if could try it out on multiple different audio files. A much quicker way that
-adding each file to the workspace is to build a small user interface to select the files and then run the program.
+implemented, it would be nice if we could try it out on multiple different audio files. A much quicker way that
+adding each file to the workspace is to __build a small user interface__ to select the files and then run the program.
 
-A set of related object types exist for this: _Control_, _Act_, and _Widget_. They form programs in their own right,
+A set of related object types exists for this: _Control_, _Act_, and _Widget_. They form programs in their own right,
 use the same language constructs, but are different in the results. A _Control_ object is most similar again to
 a PD or Max patcher that consists only of messaging objects. There are values which are connected through a data-flow
 program, and there are actions issued through triggers such as `Bang`. While a _Control_ program can exist over a
 period of time (it just "sits" there waiting for input and reacting), an _Act_---short for action---is an atomic
-operation, and becomes useful mostly as a way to glueing together different components. The _Widget_ program finally
+operation, and becomes useful when glueing together different components. The _Widget_ program finally
 is a variant of a _Control_ program that also produces visual components which are rendered as a user interface.
 Thus, what we want to add here, is a _Widget_ program that gives us visual components for specifying input and
 output audio files.
 
 In order not to overload this tutorial, I am not going to explain in detail how the Control and Widget programs are
-written (this may become content of another tutorial), but just present an example that can be coupled to the FScape 
-program.
+written (this may become topic of another tutorial), but I will just present an example that can be coupled to the
+FScape program.
 
 To create a Widget program, go to the workspace root window, press the plus button and select 
 _Organization → Widget_. Alternatively and faster, create this object using the keyboard:
@@ -694,7 +696,7 @@ _Organization → Widget_. Alternatively and faster, create this object using th
 
 ![New Widget Object in Workspace Root](.../tut-paulstretch-root-has-new-widget.png)
 
-Since we want to control the FScape program with the Widget, we can already "link" them. 
+Since we want to control the FScape program with the Widget, we have to "link" them. 
 Use the drag-and-drop operation as before, this time dragging the FScape program onto the attribute map of the
 Widget program---you open the latter by selecting the Widget object and click on the wrench-button or use the
 keyboard shortcut <kbd>ctrl</kbd>-<kbd>;</kbd> (Mac: <kbd>cmd</kbd>-<kbd>;</kbd>). When dropping the FScape program
@@ -702,7 +704,7 @@ here, use `run` as the key name in the prompt. This is the key we will use in th
 
 ![Widget Attribute Map](.../tut-paulstretch-widget-attr.png)
 
-Now we edit the widget program. Like an FScape program, selecting the Widget object in the workspace root window and 
+Now we edit the Widget program. Like an FScape program, selecting the Widget object in the workspace root window and 
 pressing the eye-button (or keyboard <kbd>ctrl</kbd>-<kbd>enter</kbd>, Mac: <kbd>cmd</kbd>-<kbd>enter</kbd>) opens the 
 text editor, the initial program being empty. Paste the following code:
 
@@ -738,7 +740,7 @@ BorderPanel(
 ```
 
 The main take-away from this is that we can refer to another object using `Runner(key)`. A runner is a control
-element that allows use to "run" the underlying element. Running an FScape program means to issue the render
+element that allows us to "run" the underlying element. Running an FScape program means to issue the render
 action. The other elements in the program are mainly `Button` widgets, text `Label` widgets, and for the audio file
 input and output we use `AudioFileIn` and `AudioFileOut`. The double-arrow operations `<-->` link the state of the
 widgets to the attribute map of the FScape object, and the right-pointing arrows `--->` link triggers to actions.
@@ -751,7 +753,7 @@ When you _Apply_ the program and switch to _Interface_ tab, you see the user int
 Click the ellipsis-buttons `...` for _Input_ and _Output_ to select different audio files now, and click _Render_ to
 create new paul-stretch renderings.
 
-Now the final step is to polish the programs a bit. It would be nice if we could also set the window size and
+The final step is to polish the programs a bit. It would be nice if we could also set the window size and
 stretch factor in the user interface, as well as the audio file type for the output. Without further discussion,
 I will paste the final programs here. FScape:
 
@@ -852,7 +854,7 @@ BorderPanel(
 
 @@@ note
 
-Future versions will likely see a macro to set up the render/cancel/progress-bar part of the widget
+Future versions will likely see a macro to set up the render/cancel/progress-bar part of the Widget
 program with less ceremony.
 
 @@@
@@ -861,7 +863,8 @@ program with less ceremony.
 
 ## Download the Workspace
 
-You can obtain a ready-made workspace containing the final versions of the programs, by downloading
-the `PaulStretch.mllt.zip` file from the @link:[Mellite downloads](https://archive.org/download/Mellite).
+You can obtain a ready-to-use workspace containing the final versions of the programs, by downloading
+the `PaulStretch.zip` file from the @link:[Mellite downloads](https://archive.org/download/Mellite) { open=new }.
 After extracting the zip archive, use the menu item _File → Open…_ from Mellite's main window and select the
-`PaulStretch.mllt` directory in the chooser.
+`PaulStretch.mllt` directory in the chooser. If you have any problems, questions, or feedback,
+please use the Gitter channel.

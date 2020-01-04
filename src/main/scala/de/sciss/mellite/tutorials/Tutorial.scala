@@ -549,9 +549,15 @@ trait Tutorial {
   }
 
   def findPopup(): scala.swing.PopupMenu = {
-    val opt = java.awt.Window.getWindows.collectFirst {
-      case w: JWindow if w.getType == java.awt.Window.Type.POPUP => w
-    } .flatMap { w =>
+    val all = java.awt.Window.getWindows
+//    println("FIND POPUP:")
+//    all.foreach(println)
+    val opt1 = all.collectFirst {
+      case w: JWindow if w.getType == java.awt.Window.Type.POPUP && w.isShowing => w
+    }
+//    println("OPT:")
+//    println(opt1)
+    val opt = opt1.flatMap { w =>
       findChild(w.getContentPane) {
           case j: javax.swing.JPopupMenu => j
         }

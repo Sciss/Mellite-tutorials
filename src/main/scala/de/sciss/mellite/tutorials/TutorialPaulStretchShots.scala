@@ -40,14 +40,20 @@ object TutorialPaulStretchShots extends Tutorial {
   type S = Durable
 
   def started(): Future[Unit] = {
-    runShowFinalWidget()
+    for {
+      _ <- runNewWorkspace()
+      _ <- delay()
+      _ <- runPopulateWorkspace()
+      _ <- delay()
+      _ <- runShowFinalWidget()
+    } yield () // quit()
   }
 
   def runShowFinalWidget(): Future[Unit] = {
     for {
       _ <- delay()
       _ <- onEDT {
-        val ws = mkTempWorkspace(wsName)
+        val ws = mkTempWorkspace("final")
         ws.cursor.step { implicit tx =>
           MkPaulStretchWorkspace.populate(ws)
           val wid = ws.root.head
@@ -65,7 +71,7 @@ object TutorialPaulStretchShots extends Tutorial {
       }
       _ <- delay()
       _ <- onEDT {
-        findWindow(wsName).visible = false
+        findWindow("final").visible = false
       }
       _ <- snapWindow(findWindow(MkPaulStretchWorkspace.name), s"$assetPre-widget-ui-final")
 
@@ -114,6 +120,7 @@ object TutorialPaulStretchShots extends Tutorial {
         selectPopup("Composition", "FScape")
 //        println(w)
       }
+      _ <- delay()
       _ <- snapComponent(findPopup(), s"$assetPre-popup-folder-new-object")
       _ <- onEDT(clickMouse())
       _ <- delay()
@@ -409,11 +416,16 @@ object TutorialPaulStretchShots extends Tutorial {
         typeModKey(KeyEvent.VK_CONTROL, KeyEvent.VK_ENTER)
       }
       _ <- delay()
-      _ <- onEDT {
+      wWidget <- onEDT {
         wAttrWidget.window.visible = false
         wWorkspace        .visible = false
+        findWindow("Widget")
       }
-      _ <- snapWindow(findWindow("Widget"), s"$assetPre-widget-ui")
+      _ <- snapWindow(wWidget, s"$assetPre-widget-ui")
+      _ <- onEDT {
+        mainFrame.front()
+        wWidget.visible = false
+      }
     } yield ()
   }
 
@@ -447,6 +459,10 @@ object TutorialPaulStretchShots extends Tutorial {
         w
       }
       _ <- snapComponent(wLocNewWorkspace, s"$assetPre-filechooser-new-workspace", pointer = false)
+      _ <- onEDT {
+        typeKey(KeyEvent.VK_ESCAPE)
+        mainFrame.front()
+      }
 
     } yield ()
   }
