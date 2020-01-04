@@ -7,9 +7,13 @@ import java.awt.{BasicStroke, Color, EventQueue, GraphicsConfiguration, Graphics
 
 import de.sciss.desktop.Window
 import de.sciss.file._
-import de.sciss.mellite.{LogFrame, MainFrame, Mellite}
-import de.sciss.treetable.{TreeColumnModel, TreeTable}
+import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Obj
+import de.sciss.lucre.synth.Sys
+import de.sciss.mellite.{AttrMapFrame, LogFrame, MainFrame, Mellite}
+import de.sciss.synth.proc.{Universe, Workspace}
 import de.sciss.treetable.j.{TreeTable => JTreeTable}
+import de.sciss.treetable.{TreeColumnModel, TreeTable}
 import javax.imageio.ImageIO
 import javax.swing.event.{ChangeEvent, ChangeListener}
 import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JTable, JWindow, MenuElement, Timer}
@@ -23,6 +27,8 @@ trait Tutorial {
   def started(): Future[Unit]
 
   def assets: File
+
+  def overwriteSnaps: Boolean
 
 //  def mainWindow: Window = Mellite.windowHandler.mainWindow
 
@@ -392,6 +398,13 @@ trait Tutorial {
       ensureFlatEDT(snapComponentEDT(c, name, pointer = pointer, code = code))
     )
 
+  def mkAttrMapFrame[S <: Sys[S]](ws: Workspace[S], obj: Obj[S])(implicit tx: S#Tx): AttrMapFrame[S] = {
+    implicit val c  : stm.Cursor[S] = ws.cursor
+    implicit val _ws: Workspace [S] = ws
+    implicit val u  : Universe  [S] = Universe()
+    AttrMapFrame(obj)
+  }
+
   private[this] lazy val pointerImg: Image = {
     val url = getClass.getResource("/GnomePointer.png")
 //    Toolkit.getDefaultToolkit.getImage(url)
@@ -402,6 +415,9 @@ trait Tutorial {
   private def snapComponentEDT(c: UIElement, name: String, pointer: Boolean,
                                code: Graphics2D => Unit): Future[Unit] = try {
     requireEDT()
+    val fOut = assets / s"$name.png"
+    if (!overwriteSnaps && fOut.exists()) return Future.successful(())
+
     val img = robot.createScreenCapture(graphicsConfiguration.getBounds)
     if (pointer || code != null) {
       val gImg = img.createGraphics()
@@ -486,7 +502,7 @@ trait Tutorial {
     g.dispose()
     img.flush()
 
-    ImageIO.write(crop, "png", assets / s"$name.png")
+    ImageIO.write(crop, "png", fOut)
     crop.flush()
     // println("---2 snapWindowEDT")
     Future.successful(())

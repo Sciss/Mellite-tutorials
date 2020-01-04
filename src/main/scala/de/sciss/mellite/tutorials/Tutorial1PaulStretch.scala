@@ -6,12 +6,11 @@ import java.util.concurrent.TimeUnit
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr.{DoubleObj, LongObj}
-import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.mellite.{ActionOpenWorkspace, AttrMapFrame, Mellite, Prefs}
+import de.sciss.mellite.{ActionOpenWorkspace, Mellite, Prefs}
 import de.sciss.synth.io.AudioFile
 import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.{AudioCue, Durable, Universe, Workspace}
+import de.sciss.synth.proc.{AudioCue, Durable, Workspace}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -25,6 +24,7 @@ object Tutorial1PaulStretch extends Tutorial {
   val assetPre            = "tut-paulstretch"
   val wsName              = "PaulStretchTutorial"
   val afName              = "337048_131348kaonayabell"
+  def overwriteSnaps      = false
 
   def mkTempWorkspace(name: String): Workspace.Durable = {
     val config          = BerkeleyDB.Config()
@@ -134,7 +134,7 @@ object Tutorial1PaulStretch extends Tutorial {
         typeKey   (KeyEvent.VK_S) // save / apply
         releaseKey(KeyEvent.VK_CONTROL)
       }
-      _ <- delay(2000)  /// XXX TODO tricky wait for compilation
+      _ <- delay(2000) /// XXX TODO tricky wait for compilation
       _ <- onEDT {
         pressKey  (KeyEvent.VK_SHIFT)
         typeKey   (KeyEvent.VK_F10) // render
@@ -208,32 +208,27 @@ object Tutorial1PaulStretch extends Tutorial {
         wCue.visible = false
       }
       _ <- snapWindow(mainFrame, s"$assetPre-audio-system-booted")
-      wAttr <- onEDT {
+      wAttrFSc <- onEDT {
         wWorkspace.front()
         mainFrame.visible = false
         ws.cursor.step { implicit tx =>
           val f   = ws.root
           val fsc = f.head
-//          val cue = f.last
-//          fsc.attr.put("in", cue)
-          implicit val c  : stm.Cursor[S] = ws.cursor
-          implicit val _ws: Workspace [S] = ws
-          implicit val u  : Universe  [S] = Universe()
-          AttrMapFrame(fsc)
+          mkAttrMapFrame[S](ws, fsc)
         }
       }
       _ <- onEDT {
-        val pt = wAttr.window.location
-        val sz = wAttr.window.size
+        val pt = wAttrFSc.window.location
+        val sz = wAttrFSc.window.size
         val locWs = wWorkspace.location
         val szWs = wWorkspace.size
         pt.y = locWs.y + szWs.height + 4
         pt.x = locWs.x + (wWorkspace.size.width - sz.width) / 2
-        wAttr.window.location = pt
+        wAttrFSc.window.location = pt
       }
       _ <- delay()
       (linkSrcX, linkSrcY, linkTgtX, linkTgtY) <- onEDT {
-        val t = findTable(windowComponent(wAttr.window)).peer
+        val t = findTable(windowComponent(wAttrFSc.window)).peer
 //        val tcm = t.peer.getColumnModel
         val ptTgt = t.getLocationOnScreen
 //        val cx  = pt0.x + tcm.getColumn(0).getWidth + tcm.getColumn(1).getWidth/2
@@ -254,12 +249,12 @@ object Tutorial1PaulStretch extends Tutorial {
       _ <- delay(100)
       _ <- onEDT(moveMouse(linkTgtX, linkTgtY - 4))
       _ <- delay(250)
-//      _ <- onEDT(pressMouse())
-//      _ <- delay(250)
+      //      _ <- onEDT(pressMouse())
+      //      _ <- delay(250)
       _ <- onEDT {
         moveMouse(linkTgtX, linkTgtY)
       }
-      _ <- snapWindow(wAttr.window, s"$assetPre-dnd-to-attr", pointer = false, code = { g2 =>
+      _ <- snapWindow(wAttrFSc.window, s"$assetPre-dnd-to-attr", pointer = false, code = { g2 =>
         drawArrow(g2, linkSrcX, linkSrcY, linkTgtX, linkTgtY)
 //        g2.drawLine(linkTgtX - 4, linkTgtY, linkTgtX + 4, linkTgtY)
 //        g2.drawLine(linkTgtX, linkTgtY - 4, linkTgtX, linkTgtY + 4)
@@ -277,7 +272,7 @@ object Tutorial1PaulStretch extends Tutorial {
           fsc.attr.put("in", cue)
         }
       }
-      _ <- snapWindow(wAttr.window, s"$assetPre-link-in-to-attr")
+      _ <- snapWindow(wAttrFSc.window, s"$assetPre-link-in-to-attr")
       _ <- onEDT {
         ws.cursor.step { implicit tx =>
           val f   = ws.root
@@ -289,17 +284,17 @@ object Tutorial1PaulStretch extends Tutorial {
         }
       }
       _ <- onEDT {
-        val t = findTable(windowComponent(wAttr.window)).peer
+        val t = findTable(windowComponent(wAttrFSc.window)).peer
         val ptTgt = t.getLocationOnScreen
         val rTgt  = t.getCellRect(3, 1, false)
         val tgtX  = ptTgt.x + rTgt.x + rTgt.width/2
         val tgtY  = ptTgt.y + rTgt.y + rTgt.height/2
         moveMouse(tgtX, tgtY)
       }
-      _ <- snapWindow(wAttr.window, s"$assetPre-link-out-to-attr")
+      _ <- snapWindow(wAttrFSc.window, s"$assetPre-link-out-to-attr")
       _ <- onEDT {
         wWorkspace.front()
-        wAttr.window.visible = false
+        wAttrFSc.window.visible = false
       }
       _ <- delay()
       _ <- onEDT {
@@ -307,10 +302,32 @@ object Tutorial1PaulStretch extends Tutorial {
       }
       _ <- delay()
       _ <- onEDT {
-        KeyEvent.VK_W
         "WIDGET".foreach(c => typeKey(c.toInt))
       }
       _ <- snapWindow(wWorkspace, s"$assetPre-type-new-widget")
+      _ <- onEDT {
+        typeKey(KeyEvent.VK_ENTER)
+      }
+      _ <- delay()
+      _ <- onEDT {
+        ttRoot.requestFocus()
+        typeKey(KeyEvent.VK_DOWN)
+      }
+      _ <- snapWindow(wWorkspace, s"$assetPre-root-has-new-widget")
+      wAttrWidget <- onEDT {
+        ws.cursor.step { implicit tx =>
+          val f = ws.root
+          val fsc = f.head
+          val wid = f.last
+          wid.attr.put("run", fsc)
+          mkAttrMapFrame[S](ws, wid)
+        }
+      }
+      _ <- delay()
+      _ <- onEDT {
+        wWorkspace.visible = false
+      }
+      _ <- snapWindow(wAttrWidget.window, s"$assetPre-widget-attr")
     } yield ()
   }
 

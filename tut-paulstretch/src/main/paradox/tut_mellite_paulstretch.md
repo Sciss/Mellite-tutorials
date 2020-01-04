@@ -689,9 +689,21 @@ _Organization → Widget_. Alternatively and faster, create this object using th
 <kbd>ctrl</kbd>-<kbd>1</kbd> (Mac: <kbd>cmd</kbd>-<kbd>1</kbd>) brings up a text prompt. Enter `widget` and press
 <kbd>enter</kbd>.
 
-Like an FScape program, selecting the object and pressing the eye-button (or keyboard
-<kbd>ctrl</kbd>-<kbd>enter</kbd>, Mac: <kbd>cmd</kbd>-<kbd>enter</kbd>) opens the text editor, the initial program
-being empty. Paste the following code:
+![Keyboard Input to Create New Widget](.../tut-paulstretch-type-new-widget.png)
+
+![New Widget Object in Workspace Root](.../tut-paulstretch-root-has-new-widget.png)
+
+Since we want to control the FScape program with the Widget, we can already "link" them. 
+Use the drag-and-drop operation as before, this time dragging the FScape program onto the attribute map of the
+Widget program---you open the latter by selecting the Widget object and click on the wrench-button or use the
+keyboard shortcut <kbd>ctrl</kbd>-<kbd>;</kbd> (Mac: <kbd>cmd</kbd>-<kbd>;</kbd>). When dropping the FScape program
+here, use `run` as the key name in the prompt. This is the key we will use in the Widget program.
+
+![Widget Attribute Map](.../tut-paulstretch-widget-attr.png)
+
+Now we edit the widget program. Like an FScape program, selecting the Widget object in the main workspace window and 
+pressing the eye-button (or keyboard <kbd>ctrl</kbd>-<kbd>enter</kbd>, Mac: <kbd>cmd</kbd>-<kbd>enter</kbd>) opens the 
+text editor, the initial program being empty. Paste the following code:
 
 ```scala
 val r       = Runner("run")
@@ -700,10 +712,8 @@ val out     = AudioFileOut()
 val render  = Button(" Render ")
 val cancel  = Button(" X ")
 
-in .value         <--> Artifact("run:in")
-out.value         <--> Artifact("run:out")
-out.fileType      <--> "run:out-type"   .attr(0)
-out.sampleFormat  <--> "run:out-format" .attr(2)
+in .value <--> Artifact("run:in")
+out.value <--> Artifact("run:out")
 
 val running = r.state sig_== 3
 render.clicked ---> r.run
@@ -726,15 +736,13 @@ BorderPanel(
 )
 ```
 
-Before you can _Apply_ it, you must link the FScape program to the Widget program's `run` key in the attribute map.
+The main take-away from this is that we can refer to another object using `Runner(key)`. A runner is a control
+element that allows use to "run" the underlying element. Running an FScape program means to issue the render
+action. The other elements in the program are mainly `Button` widgets, text `Label` widgets, and for the audio file
+input and output we use `AudioFileIn` and `AudioFileOut`. The double-arrow operations `<-->` link the state of the
+widgets to the attribute map of the FScape object, and the right-pointing arrows `--->` link triggers to actions.
+The bottom part of the program consists in creating layout containers for the widgets.
 
-@@@ warning {title=Bug }
+When you _Apply_ the program and switch to _Interface_ tab, you see the user interface thus described:
 
-This is a current shortcoming. In future versions, it will be possible to apply the program even when attribute
-entries are still missing.
 
-@@@
-
-Use the drag-and-drop operation as before, this time dragging the FScape program onto the attribute map of the
-Widget program---you open the latter by selecting the Widget object and click on the wrench-button or use the
-keyboard shortcut <kbd>ctrl</kbd>-<kbd>;</kbd> (Mac: <kbd>cmd</kbd>-<kbd>;</kbd>).
