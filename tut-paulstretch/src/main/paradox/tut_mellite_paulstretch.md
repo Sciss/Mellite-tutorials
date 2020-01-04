@@ -463,3 +463,58 @@ AudioFileOut("out", sig, sampleRate = in.sampleRate)
 Now `in` is called three times, first when calculating the amplitude, next when calculating the
 normalized signal, and a third time when querying the sampling rate `in.sampleRate`. The last call is inexpensive,
 however, as it does not stream the whole signal but just retrieves the audio file header.
+
+@@@ note { title=Scala }
+
+While a `val a = b` means that the right-hand-side expression `b` is evaluated once and the result assigned to `a`,
+the method definition `def a = b` means that _whenever_ we refer to `a`, the expression `b` is evaluated anew.
+If `b` is a constant, there is no difference between `val a` and `def a`, however in FScape, expressions
+such as `AudioFileIn(...)` place the UGen in the signal graph, so if we evaluate that expression twice, we actually
+create two independent instances of the UGen.
+
+@@@
+
+## PaulStretch in FScape
+
+After this long haul, I want to dump the entire program first, so can experiment with it and render an
+actual sound, before taking it apart and explaining the steps:
+
+```scala
+val in          = AudioFileIn("in")
+val winSizeSec  = 1.0 // window size in seconds
+val stretch     = 8.0 // stretch factor
+val N           = 4   // output window overlap
+val sr          = in.sampleRate
+val numFramesIn = in.numFrames
+val winSize     = (winSizeSec * sr).roundTo(1).max(1)
+val stepSizeOut = (winSize / N).roundTo(1).max(1)
+val stepSizeIn  = (winSize / (N * stretch)).roundTo(1).max(1)
+val numStepsIn  = (numFramesIn / stepSizeIn).ceil
+val numFramesOut= (numStepsIn - 1).max(0) * stepSizeOut + winSize
+val slidIn      = Sliding(in, size = winSize, step = stepSizeIn)
+val winAna      = GenWindow(winSize, shape = GenWindow.Hann)
+val inW         = slidIn * winAna
+val fftSize     = winSize.nextPowerOfTwo
+val fft         = Real1FFT(inW, winSize, padding = fftSize - winSize)
+val mag         = fft.complex.mag
+val phase       = WhiteNoise(math.Pi)
+val real        = mag * phase.cos
+val imag        = mag * phase.sin
+val rand        = real zip imag
+val ifft        = Real1IFFT(rand, fftSize)
+val slidOut     = ResizeWindow(ifft, fftSize, stop = winSize - fftSize)
+val winSyn      = GenWindow(winSize, shape = GenWindow.Hann)
+val outW        = slidOut * winSyn
+val lap         = OverlapAdd(outW, size = winSize, step = stepSizeOut)
+val lapTrim     = lap.take(numFramesOut)
+val maxAmp      = RunningMax(Reduce.max(lapTrim.abs)).last
+val gain        = 1.0 / maxAmp
+val norm        = BufferDisk(lapTrim) * gain
+AudioFileOut("out", norm, sampleRate = sr)
+```
+
+If you run this with the example bell audio file, the result should sound like this:
+
+<audio controls>
+  <source src="bell-stretched.mp3" type="audio/wav">
+</audio>
