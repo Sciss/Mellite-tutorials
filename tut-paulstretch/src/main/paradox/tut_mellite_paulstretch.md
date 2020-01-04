@@ -562,3 +562,110 @@ use infinitely long generator UGens, such as the window function generator `GenW
 truncate the process, otherwise it would render without stopping; this happens towards the end when we write
 `lap.take(numFramesOut)`.
 
+What happens between `Sliding` and `OverlapAdd`? First of all, the windows are multiplied by a
+@link:[window function](https://en.wikipedia.org/wiki/Window_function)
+that produces a fade-in and fade-out for each window:
+
+```scala
+val winAna      = GenWindow(winSize, shape = GenWindow.Hann)
+val inW         = slidIn * winAna
+...
+val winSyn      = GenWindow(winSize, shape = GenWindow.Hann)
+val outW        = slidOut * winSyn
+```
+
+We use the common @link:[Hann window](https://en.wikipedia.org/wiki/Hann_window) which is also shown in the 
+PaulStretch algorithm diagram.
+
+@@@ note
+
+The original Python
+implementation only applies this window in the analysis stage, whereas the synthesis tries to apply a
+"compensating" window based on the inverted overlapped Hann window; however, I believe this to be wrong because
+the phase randomisation in the Fourier domain essentially eliminates the analysis window shape.
+
+@@@
+
+Now to the transformation core:
+
+```scala
+val fftSize     = winSize.nextPowerOfTwo
+val fft         = Real1FFT(inW, winSize, padding = fftSize - winSize)
+val mag         = fft.complex.mag
+val phase       = WhiteNoise(math.Pi)
+val real        = mag * phase.cos
+val imag        = mag * phase.sin
+val rand        = real zip imag
+val ifft        = Real1IFFT(rand, fftSize)
+val slidOut     = ResizeWindow(ifft, fftSize, stop = winSize - fftSize)
+```
+
+The @link:[Fast Fourier Transform (FFT)](https://en.wikipedia.org/wiki/Fast_Fourier_transform) { open=new }
+works most efficiently when the window size is a power of two (2, 4, 8, 16, 32, 64, ...), therefore we find
+`val fftSize = winSize.nextPowerOfTwo`---the next integer number equal to or greater than `winSize` which is a power
+of two. The FFT transforms a "time domain" signal into a "frequency domain" signal or vice versa. Often this is called
+forward transform (time to frequency) or inverse transform (frequency to time). Apart from floating-point number
+noise, a forward FFT followed by an inverse FFT reconstructs the original signal. In FScape, the forward transform is
+`Real1FFT`, and the inverse transform is `Real1IFFT`. "Real" means that the time domain signal is
+@link:[real](https://en.wikipedia.org/wiki/Real_number) { open=new } as opposed to the frequency domain signal which is
+@link:[complex](https://en.wikipedia.org/wiki/Complex_number) { open=new }. The `1` in `Real1FFT` indicates that the
+transform is applied to a one-dimensional signal, such as sound. There is also a variant for two-dimensional signals
+which is useful for matrices and images.
+
+Care must be taken in terms of the window sizes, since `winSize` is not the same as `fftSize`. In the forward
+transform, we reflect this with the `padding` parameter which means that for each chunk of input signal of length
+`winSize`, another `fftSize - winSize` zeroes are appended before taking the FFT, thus producing exactly chunks of
+length `fftSize`. In the inverse transform, we make sure to go back to the original `winSize` by subsequently
+resizing the windows coming out of the IFFT. `ResizeWindow` works by taking an input signal assumed to be chunked
+in `fftSize` windows, then for each window we adjust the window `stop` or end position by the delta
+`winSize - fftSize`, in other words shrinking the windows by dropping the last `fftSize - winSize` sample frames.
+We could have used `ResizeWindow` in a symmetrical fashion with the forward transform:
+
+```scala
+val inPad       = ResizeWindow(inW, winSize, stop = fftSize - winSize)
+val fft         = Real1FFT(inPad, fftSize)
+```
+
+In the frequency domain, we want to preserve the magnitudes of the frequency bins, while replacing the phases
+with random values. Currently, FScape does not have a dedicated data type for complex signals, so it represents
+complex signals as ordinary sequences of floating-point numbers where real and imaginary parts of the complex
+numbers are interleaved. Always two subsequent "real" values thus represent actually one complex value. To help
+with this situation, we can activate pseudo complex number operations by writing `.complex`. In this case,
+`.complex.mag` takes the input signal, treats it as if it was complex, grouping always pairs of values as
+real/imaginary components, then calculating the magnitudes of these values
+(see @link:[polar complex plane](https://en.wikipedia.org/wiki/Complex_number#Polar_complex_plane) { open=new } 
+if you need a refresher on the magnitudes and phases of complex numbers). In the same manner we could obtain the
+phase information as `.complex.phase`, but since we replace the original phases by random numbers, we do not need
+this information.
+
+The easiest way to create pseudo-random numbers is to use the `WhiteNoise` generator. Its argument is the amplitude
+of the noise, producing thus random values between `-amp` and `+amp`. Phases in
+@link:[radians](https://en.wikipedia.org/wiki/Radian) { open=new } are periodic in 2π, so we use
+`WhiteNoise(math.Pi)` to produce random numbers between `-π = -3.14159` and `+π = +3.14159`.
+
+We convert back from polar coordinates (magnitude and phase) to cartesian coordinates (real and imaginary parts):
+
+```scala
+val real        = mag * phase.cos
+val imag        = mag * phase.sin
+```
+
+And we re-interleave real and imaginary part through `real zip imag`, which produces a signal where values are
+alternatingly taken from the `real` and `imag` input signals.
+
+@@@ note { title=Scala }
+
+Scala's general syntax for calling methods is to use dot and parentheses---for example
+`mag.*(phase.cos)` or `real.zip(imag)`. When a method has exactly one parameter, an alternative is
+infix syntax---for example `mag * phase.cos` or `real zip imag`.
+For binary mathematical operations, we normally use the infix syntax which feels more natural.
+
+@@@
+
+## Adding a Control Interface
+
+@@@ warning { title=Note }
+
+This section has not been written yet.
+
+@@@
