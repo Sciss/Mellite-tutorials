@@ -476,8 +476,8 @@ create two independent instances of the UGen.
 
 ## PaulStretch in FScape
 
-After this long haul, I want to dump the entire program first, so can experiment with it and render an
-actual sound, before taking it apart and explaining the steps:
+After this long haul, I want to dump the entire program first---before taking it apart and explaining the 
+steps---so you can already experiment with it and render an actual sound:
 
 ```scala
 val in          = AudioFileIn("in")
@@ -518,3 +518,31 @@ If you run this with the example bell audio file, the result should sound like t
 <audio controls>
   <source src="bell-stretched.mp3" type="audio/wav">
 </audio>
+
+Now the explanations. For a better understanding, refer back to the diagrammatic algorithm scheme at the beginning
+of the tutorial---it more or less directly translates into this code. First, we select the two crucial parameters,
+the window size in seconds, `winSizeSec` and the `stretch` factor. We can convert durations in seconds into durations
+in sample-frames---the unit that most UGens will work with---by multiplying with the sampling rate:
+`val winSize = (winSizeSec * sr).roundTo(1).max(1)`. The last two operations ensure that we end up with an integer
+number of sample-frames, and irrespective of the parameters chosen, the window size will never be smaller than one.
+
+@@@ note
+
+FScape has a very simple signal data type, it is just a stream of 64-bit floating point numbers, similar how to
+audio signals in PD, Max, or SuperCollider are represented. Many UGens technically use integer numbers internally,
+for example when applying a sliding window over an input signal, the window size and stepping size are treated as
+integer numbers (automatically cutting off decimal fractions). So in general, we do not need to round decimals numbers
+using `roundTo(1)` ("round to multiples of one"). But
+as we use the variable `winSize` to calculate further values, we avoid problems resulting from decimal numbers in our
+own formulas. It is planned that the signal data type in future versions of FScape explicitly distinguishes between
+decimal and integer numbers.
+
+@@@
+
+The parameter `N` relates to the step parameter
+in the diagram. I found that `4` works good with most sounds, it means that the window overlap in the reconstruction
+step (overlap-add) is 4 or 75% (the stepping size is 1/4 of the window size). More precisely, that stepping size is
+given by `val stepSizeOut = (winSize / N).roundTo(1).max(1)`. The last two operations ensure that 
+
+In order to obtain the stretching
+effect, we now use a much smaller stepping size in the analysis phase 
