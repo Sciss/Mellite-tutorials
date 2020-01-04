@@ -380,9 +380,9 @@ val sig       = in * gain
 AudioFileOut("out", sig, sampleRate = in.sampleRate)
 ```
 
-The gain factor is simply the reciprocal of the maximum amplitude found in the input. So `1.0 / 0.2668` is 
-`3.7477`, and if all input sample values are multiplied by that factor, the maximum output amplitude is thus
-`0.2668 * 3.7477 = 1.0`. You can also see that we can multiple a multi-channel signal (`in`) with a single-channel
+The gain factor is simply the reciprocal of the maximum amplitude found in the input. So `1.0 / 0.2668 ≈ 3.7477`, 
+and if all input sample values are multiplied by that factor, the maximum output amplitude is thus
+`0.2668 * 3.7477 ≈ 1.0`. You can also see that we can multiple a multi-channel signal (`in`) with a single-channel
 signal (`gain`). Again, this works like multi-channel-expansion in SuperCollider: The result will have the maximum
 number of channel found (here two), and in the `BinaryOp`---the UGen produced by the `*` operator---the first
 and only channel of `gain` is used for both channels of `in`. Finally, writing the output file looks similar to
@@ -641,7 +641,7 @@ this information.
 The easiest way to create pseudo-random numbers is to use the `WhiteNoise` generator. Its argument is the amplitude
 of the noise, producing thus random values between `-amp` and `+amp`. Phases in
 @link:[radians](https://en.wikipedia.org/wiki/Radian) { open=new } are periodic in 2π, so we use
-`WhiteNoise(math.Pi)` to produce random numbers between `-π = -3.14159` and `+π = +3.14159`.
+`WhiteNoise(math.Pi)` to produce random numbers between `-π ≈ -3.14159` and `+π ≈ +3.14159`.
 
 We convert back from polar coordinates (magnitude and phase) to cartesian coordinates (real and imaginary parts):
 
@@ -664,8 +664,77 @@ For binary mathematical operations, we normally use the infix syntax which feels
 
 ## Adding a Control Interface
 
-@@@ warning { title=Note }
+All the effort of adding audio files and artifacts to the workspace must be good for something, or else we could
+just have hard-coded the input and output paths in the program. As stated before, the attribute map is Mellite's
+way of allowing different objects to be interacting with each other. Now that we have the full stretching algorithm
+implemented, it would be nice if could try it out on multiple different audio files. A much quicker way that
+adding each file to the workspace is to build a small user interface to select the files and then run the program.
 
-This section has not been written yet.
+A set of related object types exist for this: _Control_, _Act_, and _Widget_. They form programs in their own right,
+use the same language constructs, but are different in the results. A _Control_ object is most similar again to
+a PD or Max patcher that consists only of messaging objects. There are values which are connected through a data-flow
+program, and there are actions issued through triggers such as `Bang`. While a _Control_ program can exist over a
+period of time (it just "sits" there waiting for input and reacting), an _Act_---short for action---is an atomic
+operation, and becomes useful mostly as a way to glueing together different components. The _Widget_ program finally
+is a variant of a _Control_ program that also produces visual components which are rendered as a user interface.
+Thus, what we want to add here, is a _Widget_ program that gives us visual components for specifying input and
+output audio files.
+
+In order not to overload this tutorial, I am not going to explain in detail how the Control and Widget programs are
+written (this may become content of another tutorial), but just present an example that can be coupled to the FScape 
+program.
+
+To create a Widget program, go into the main workspace window, press the plus button and select 
+_Organization → Widget_. Alternatively and faster, create this object using the keyboard:
+<kbd>ctrl</kbd>-<kbd>1</kbd> (Mac: <kbd>cmd</kbd>-<kbd>1</kbd>) brings up a text prompt. Enter `widget` and press
+<kbd>enter</kbd>.
+
+Like an FScape program, selecting the object and pressing the eye-button (or keyboard
+<kbd>ctrl</kbd>-<kbd>enter</kbd>, Mac: <kbd>cmd</kbd>-<kbd>enter</kbd>) opens the text editor, the initial program
+being empty. Paste the following code:
+
+```scala
+val r       = Runner("run")
+val in      = AudioFileIn()
+val out     = AudioFileOut()
+val render  = Button(" Render ")
+val cancel  = Button(" X ")
+
+in .value         <--> Artifact("run:in")
+out.value         <--> Artifact("run:out")
+out.fileType      <--> "run:out-type"   .attr(0)
+out.sampleFormat  <--> "run:out-format" .attr(2)
+
+val running = r.state sig_== 3
+render.clicked ---> r.run
+cancel.clicked ---> r.stop
+render.enabled = !running
+cancel.enabled = running
+
+val p = GridPanel(
+  Label("Input:" ), in,
+  Label("Output:"), out,
+)
+p.columns = 2
+p.border  = Border.Empty(8)
+p.hGap    = 8
+p.compact = true
+
+BorderPanel(
+  north = p,
+  south = FlowPanel(cancel, render),
+)
+```
+
+Before you can _Apply_ it, you must link the FScape program to the Widget program's `run` key in the attribute map.
+
+@@@ warning {title=Bug }
+
+This is a current shortcoming. In future versions, it will be possible to apply the program even when attribute
+entries are still missing.
 
 @@@
+
+Use the drag-and-drop operation as before, this time dragging the FScape program onto the attribute map of the
+Widget program---you open the latter by selecting the Widget object and click on the wrench-button or use the
+keyboard shortcut <kbd>ctrl</kbd>-<kbd>;</kbd> (Mac: <kbd>cmd</kbd>-<kbd>;</kbd>).

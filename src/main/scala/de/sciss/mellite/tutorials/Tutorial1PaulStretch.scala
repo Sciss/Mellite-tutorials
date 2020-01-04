@@ -297,6 +297,20 @@ object Tutorial1PaulStretch extends Tutorial {
         moveMouse(tgtX, tgtY)
       }
       _ <- snapWindow(wAttr.window, s"$assetPre-link-out-to-attr")
+      _ <- onEDT {
+        wWorkspace.front()
+        wAttr.window.visible = false
+      }
+      _ <- delay()
+      _ <- onEDT {
+        typeModKey(KeyEvent.VK_CONTROL, KeyEvent.VK_1)
+      }
+      _ <- delay()
+      _ <- onEDT {
+        KeyEvent.VK_W
+        "WIDGET".foreach(c => typeKey(c.toInt))
+      }
+      _ <- snapWindow(wWorkspace, s"$assetPre-type-new-widget")
     } yield ()
   }
 
