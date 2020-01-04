@@ -542,7 +542,23 @@ decimal and integer numbers.
 The parameter `N` relates to the step parameter
 in the diagram. I found that `4` works good with most sounds, it means that the window overlap in the reconstruction
 step (overlap-add) is 4 or 75% (the stepping size is 1/4 of the window size). More precisely, that stepping size is
-given by `val stepSizeOut = (winSize / N).roundTo(1).max(1)`. The last two operations ensure that 
+given by `val stepSizeOut = (winSize / N).roundTo(1).max(1)`. In order to obtain the stretching
+effect, we now use a much smaller stepping size in the analysis phase: 
+`val stepSizeIn = (winSize / (N * stretch)).roundTo(1).max(1)`. So with `N = 4` and `stretch = 8.0`,
+each step in analysis stage is 1/32 of the window size. The following image illustrates the process:
 
-In order to obtain the stretching
-effect, we now use a much smaller stepping size in the analysis phase 
+![Stretching of the Window Stepping](.../tut-paulstretch-window-stretching.png)
+
+The analysis segments are obtained by the `Sliding` UGens---it produces a signal where each analysis window
+follows another---and the synthesis uses the `OverlapAdd` UGen which takes the subsequent windows, overlaps and
+sums them.
+
+If `numFramesIn = in.numFrames` is the number of sample-frames
+in the input audio file, we obtain the number of windows by dividing it by the step size and rounding up to the next
+integer number (`.ceil`): `val numStepsIn = (numFramesIn / stepSizeIn).ceil`. And consequently the output will
+consist of `numStepsIn - 1` partial (overlapping) segments of `stepSizeOut` and a final full window of `winSize`:
+`val numFramesOut= (numStepsIn - 1).max(0) * stepSizeOut + winSize`. We need to calculate this length because we
+use infinitely long generator UGens, such as the window function generator `GenWindow`, and at some point we have to
+truncate the process, otherwise it would render without stopping; this happens towards the end when we write
+`lap.take(numFramesOut)`.
+
