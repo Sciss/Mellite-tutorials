@@ -1,21 +1,32 @@
+/*
+ *  Tutorial1PaulStretch.scala
+ *  (Mellite-tutorials)
+ *
+ *  Copyright (c) 2019-2020 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is published under the GNU Affero General Public License v3+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.mellite.tutorials
 
 import java.awt.event.KeyEvent
-import java.util.concurrent.TimeUnit
 
 import de.sciss.file._
-import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
-import de.sciss.lucre.expr.{DoubleObj, LongObj}
-import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.mellite.{ActionOpenWorkspace, Mellite, Prefs}
+import de.sciss.fscape.lucre.FScape
+import de.sciss.lucre.artifact.{ArtifactLocation, Artifact => AArtifact}
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, LongObj}
 import de.sciss.synth.io.AudioFile
 import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.{AudioCue, Durable, Workspace}
+import de.sciss.synth.proc.{AudioCue, Durable, Widget}
 
 import scala.concurrent.Future
-import scala.concurrent.duration.Duration
 
-object Tutorial1PaulStretch extends Tutorial {
+// This creates all screenshots of the tutorial
+object TutorialPaulStretchShots extends Tutorial {
   def main(args: Array[String]): Unit =
     startMellite()
 
@@ -26,22 +37,53 @@ object Tutorial1PaulStretch extends Tutorial {
   val afName              = "337048_131348kaonayabell"
   def overwriteSnaps      = false
 
-  def mkTempWorkspace(name: String): Workspace.Durable = {
-    val config          = BerkeleyDB.Config()
-    config.allowCreate  = true
-    val folderP         = createTempDir()
-    val folder          = folderP / s"$name.mllt"
-    val ds              = BerkeleyDB.factory(folder, config)
-    config.lockTimeout  = Duration(Prefs.dbLockTimeout.getOrElse(Prefs.defaultDbLockTimeout), TimeUnit.MILLISECONDS)
-    val w               = Workspace.Durable.empty(folder, ds)
-    val u               = Mellite.mkUniverse(w)
-    ActionOpenWorkspace.openGUI(u)
-    w
-  }
-
   type S = Durable
 
   def started(): Future[Unit] = {
+    runShowFinalWidget()
+  }
+
+  def runShowFinalWidget(): Future[Unit] = {
+    for {
+      _ <- delay()
+      _ <- onEDT {
+        val ws = mkTempWorkspace(wsName)
+        ws.cursor.step { implicit tx =>
+          MkPaulStretchWorkspace.populate(ws)
+          val wid = ws.root.head
+          val fsc = wid.attr.$[FScape]("run").get
+          val (loc, _, artIn) = mkInputArtifact()
+          val artOut = AArtifact[S](loc, AArtifact.Child("bell-stretched.aif"))
+          fsc.attr.put("in" , artIn)
+          fsc.attr.put("out", artOut)
+        }
+      }
+      _ <- delay()
+      _ <- onEDT {
+        typeKey(KeyEvent.VK_DOWN)
+        typeModKey(KeyEvent.VK_CONTROL, KeyEvent.VK_ENTER)
+      }
+      _ <- delay()
+      _ <- onEDT {
+        findWindow(wsName).visible = false
+      }
+      _ <- snapWindow(findWindow(MkPaulStretchWorkspace.name), s"$assetPre-widget-ui-final")
+
+    } yield ()
+  }
+
+  def mkInputArtifact()(implicit tx: S#Tx): (ArtifactLocation[S], AudioCue.Obj[S], AArtifact[S]) = {
+    val loc   = ArtifactLocation.newVar[S](ArtifactLocation.newConst[S](paradoxBase.absolute))
+    loc.name  = paradoxBase.base
+    val af    = paradoxBase / s"$afName.wav"
+    val spec  = AudioFile.readSpec(af)
+    val art   = AArtifact[S](loc, af)
+    val cue   = AudioCue.Obj[S](art, spec, LongObj.newVar[S](0L), DoubleObj.newVar[S](1.0))
+    cue.name  =  af.base
+    (loc, cue, art)
+  }
+
+  def runPopulateWorkspace(): Future[Unit] = {
     for {
       _ <- delay()
       ws <- onEDT {
@@ -147,14 +189,8 @@ object Tutorial1PaulStretch extends Tutorial {
         wWorkspace.visible = true
         ws.cursor.step { implicit tx =>
           val f     = ws.root
-          val loc   = ArtifactLocation.newVar(ArtifactLocation.newConst(paradoxBase.absolute))
-          loc.name  = paradoxBase.base
+          val (loc, cue, _) = mkInputArtifact()
           f.addLast(loc)
-          val af    = paradoxBase / s"$afName.wav"
-          val spec  = AudioFile.readSpec(af)
-          val art   = Artifact(loc, af)
-          val cue   = AudioCue.Obj(art, spec, LongObj.newVar(0L), DoubleObj.newVar(1.0))
-          cue.name  =  af.base
           f.addLast(cue)
         }
         wWorkspace.front()
@@ -279,7 +315,7 @@ object Tutorial1PaulStretch extends Tutorial {
           val fsc = f.head
           val cue = f.last.asInstanceOf[AudioCue.Obj.Apply[S]]
           val loc = cue.artifact.location
-          val artOut = Artifact[S](loc, Artifact.Child("normalized.aif"))
+          val artOut = AArtifact[S](loc, AArtifact.Child("normalized.aif"))
           fsc.attr.put("out", artOut)
         }
       }
@@ -328,6 +364,56 @@ object Tutorial1PaulStretch extends Tutorial {
         wWorkspace.visible = false
       }
       _ <- snapWindow(wAttrWidget.window, s"$assetPre-widget-attr")
+      _ <- onEDT {
+        ws.cursor.step { implicit tx =>
+          val f = ws.root
+          val wid = f.last.asInstanceOf[Widget[S]]
+          wid.graph() = Widget.Graph {
+            import de.sciss.lucre.expr.graph._
+            import de.sciss.lucre.swing.graph._
+            val r       = Runner("run")
+            val in      = AudioFileIn()
+            val out     = AudioFileOut()
+            val render  = Button(" Render ")
+            val cancel  = Button(" X ")
+
+            in .value <--> Artifact("run:in")
+            out.value <--> Artifact("run:out")
+
+            val running = r.state sig_== 3
+            render.clicked ---> r.run
+            cancel.clicked ---> r.stop
+            render.enabled = !running
+            cancel.enabled = running
+
+            val p = GridPanel(
+              Label("Input:" ), in,
+              Label("Output:"), out,
+            )
+            p.columns = 2
+            p.border  = Border.Empty(8)
+            p.hGap    = 8
+            p.compact = true
+
+            BorderPanel(
+              north = p,
+              south = FlowPanel(cancel, render),
+            )
+          }
+          wid.attr.put("edit-mode", BooleanObj.newVar[S](false))
+        }
+        wWorkspace.front()
+      }
+      _ <- delay()
+      _ <- onEDT {
+        typeModKey(KeyEvent.VK_CONTROL, KeyEvent.VK_ENTER)
+      }
+      _ <- delay()
+      _ <- onEDT {
+        wAttrWidget.window.visible = false
+        wWorkspace        .visible = false
+      }
+      _ <- snapWindow(findWindow("Widget"), s"$assetPre-widget-ui")
     } yield ()
   }
 

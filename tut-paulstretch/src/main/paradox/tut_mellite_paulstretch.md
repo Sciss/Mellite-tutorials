@@ -57,7 +57,8 @@ over a traditional hard disk.
 
 @@@
 
-The top element of a workspace is a so-called _Folder_. It is simply a list of elements, and you can nest folders
+The window you see now is called the __workspace root window__. It represents the top element of a workspace, 
+a so-called _Folder_. A folder is simply a list of elements, and you can nest folders
 inside folders to obtain a tree-like structure. You can think of a folder as a PD or Max patch, only that objects
 have no visual position within the patch but are just itemised as a list. Since we just created a new workspace,
 that list is initially empty. You can add new objects by clicking on the button with plus-shaped icon and choosing
@@ -69,13 +70,13 @@ This is followed by prompting a name for the new object. This is like naming a v
 _FScape_ programs, you distinguish them by name. Let's just use the default name "FScape" for now, and confirm the
 dialog:
  
-![Popup for New Object](.../tut-paulstretch-new-fscape-name.png)
+![Prompt for New Object Name](.../tut-paulstretch-new-fscape-name.png)
 
-You now see a new object in the main workspace window. It is an empty program, in order to write our signal
+You now see a new object in the workspace root window. It is an empty program, in order to write our signal
 processing code, we have to select it with the mouse or cursor keys and click on the button with the eye-shaped icon
 to open its editor:
 
-![Popup for New Object](.../tut-paulstretch-fscape-in-folder.png)
+![New Object in Workspace Root Window](.../tut-paulstretch-fscape-in-folder.png)
 
 ## Giving FScape a Spin
 
@@ -215,8 +216,8 @@ to use them in Mellite.
 
 @@@
 
-The easiest way to get the input audio file, is to add it first to the main workspace folder, and from there
-make the connection to the attribute map. Therefore, go back to the main workspace window, press the plus
+The easiest way to get the input audio file, is to add it first to the workspace root folder, and from there
+make the connection to the attribute map. Therefore, go back to the workspace root window, press the plus
 button again, and this time select _Audio File_. A file chooser opens, navigate to the WAV file downloaded, select
 it and press _Open_. A second file chooser opens, prompting you:
 
@@ -279,8 +280,8 @@ if we save and run (render) the above program, there will be an error:
 
 > java.lang.RuntimeException: AudioFileIn missing attribute in
 
-To create the necessary entry, we first open the attribute map of the FScape object. Go back to the main
-workspace window, select the FScape object in the list and click on button with the wrench-shaped icon to open
+To create the necessary entry, we first open the attribute map of the FScape object. Go back to the
+workspace root window, select the FScape object in the list and click on button with the wrench-shaped icon to open
 the corresponding attribute map.
 
 @@@ note
@@ -292,7 +293,7 @@ an object. Other attributes are defined by the user, with their keys being freel
 @@@
 
 We had already added the test audio file to the workspace, and now we need to associate it with the `"in"` key
-of the FScape attribute map: Press on the audio file entry in the main workspace window, keep the button pressed
+of the FScape attribute map: Press on the audio file entry in the workspace root window, keep the button pressed
 and move the mouse over the attribute map view, finding a position at the bottom of a row. You should see the
 mouse pointer change to a drag-and-drop pointer, and a thick line on the attribute map view indicates the drop
 position. Release the mouse button. A dialog pops up to specify the key name. Enter `in` and confirm. The new
@@ -662,7 +663,7 @@ For binary mathematical operations, we normally use the infix syntax which feels
 
 @@@
 
-## Adding a Control Interface
+## Adding a Widget Interface
 
 All the effort of adding audio files and artifacts to the workspace must be good for something, or else we could
 just have hard-coded the input and output paths in the program. As stated before, the attribute map is Mellite's
@@ -684,7 +685,7 @@ In order not to overload this tutorial, I am not going to explain in detail how 
 written (this may become content of another tutorial), but just present an example that can be coupled to the FScape 
 program.
 
-To create a Widget program, go into the main workspace window, press the plus button and select 
+To create a Widget program, go to the workspace root window, press the plus button and select 
 _Organization → Widget_. Alternatively and faster, create this object using the keyboard:
 <kbd>ctrl</kbd>-<kbd>1</kbd> (Mac: <kbd>cmd</kbd>-<kbd>1</kbd>) brings up a text prompt. Enter `widget` and press
 <kbd>enter</kbd>.
@@ -701,7 +702,7 @@ here, use `run` as the key name in the prompt. This is the key we will use in th
 
 ![Widget Attribute Map](.../tut-paulstretch-widget-attr.png)
 
-Now we edit the widget program. Like an FScape program, selecting the Widget object in the main workspace window and 
+Now we edit the widget program. Like an FScape program, selecting the Widget object in the workspace root window and 
 pressing the eye-button (or keyboard <kbd>ctrl</kbd>-<kbd>enter</kbd>, Mac: <kbd>cmd</kbd>-<kbd>enter</kbd>) opens the 
 text editor, the initial program being empty. Paste the following code:
 
@@ -745,4 +746,122 @@ The bottom part of the program consists in creating layout containers for the wi
 
 When you _Apply_ the program and switch to _Interface_ tab, you see the user interface thus described:
 
+![Rendered Widget Program](.../tut-paulstretch-widget-ui.png)
 
+Click the ellipsis-buttons `...` for _Input_ and _Output_ to select different audio files now, and click _Render_ to
+create new paul-stretch renderings.
+
+Now the final step is to polish the programs a bit. It would be nice if we could also set the window size and
+stretch factor in the user interface, as well as the audio file type for the output. Without further discussion,
+I will paste the final programs here. FScape:
+
+```scala
+val in          = AudioFileIn("in")
+val winSizeSec  =  "win-size-sec" .attr(1.0)
+val stretch     = "stretch"       .attr(8.0).max(1.0)
+val fileType    = "out-type"      .attr(0)
+val smpFmt      = "out-format"    .attr(2)
+
+val N           = 4   // output window overlap
+val sr          = in.sampleRate
+val numFramesIn = in.numFrames
+val winSize     = (winSizeSec * sr).roundTo(1).max(1)
+val stepSizeOut = (winSize / N).roundTo(1).max(1)
+val stepSizeIn  = (winSize / (N * stretch)).roundTo(1).max(1)
+val numStepsIn  = (numFramesIn / stepSizeIn).ceil
+val numFramesOut= (numStepsIn - 1).max(0) * stepSizeOut + winSize
+val slidIn      = Sliding(in, size = winSize, step = stepSizeIn)
+val winAna      = GenWindow(winSize, shape = GenWindow.Hann)
+val inW         = slidIn * winAna
+val fftSize     = winSize.nextPowerOfTwo
+val fft         = Real1FFT(inW, winSize, padding = fftSize - winSize)
+val mag         = fft.complex.mag
+val phase       = WhiteNoise(math.Pi)
+val real        = mag * phase.cos
+val imag        = mag * phase.sin
+val rand        = real zip imag
+val ifft        = Real1IFFT(rand, fftSize)
+val slidOut     = ResizeWindow(ifft, fftSize, stop = winSize - fftSize)
+val winSyn      = GenWindow(winSize, shape = GenWindow.Hann)
+val outW        = slidOut * winSyn
+val lap         = OverlapAdd(outW, size = winSize, step = stepSizeOut)
+val lapTrim     = lap.take(numFramesOut)
+ProgressFrames(lapTrim, numFramesOut, "render")
+val maxAmp      = RunningMax(Reduce.max(lapTrim.abs)).last
+val gain        = 1.0 / maxAmp
+val norm        = BufferDisk(lapTrim) * gain
+val written     = AudioFileOut("out", norm, 
+  fileType = fileType, sampleFormat = smpFmt, sampleRate = sr)
+ProgressFrames(written, numFramesOut, "write")
+```
+
+Widget:
+
+```scala
+val r       = Runner("run")
+val in      = AudioFileIn()
+val out     = AudioFileOut()
+val render  = Button(" Render ")
+val cancel  = Button(" X ")
+cancel.tooltip = "Cancel Rendering"
+val pb      = ProgressBar()
+
+in .value         <--> Artifact("run:in")
+out.value         <--> Artifact("run:out")
+out.fileType      <--> "run:out-type"   .attr(0)
+out.sampleFormat  <--> "run:out-format" .attr(2)
+
+val stretch = DoubleField()
+stretch.min = 1.0
+stretch.max = 1.0e18
+stretch.value <--> "run:stretch".attr(8.0)
+
+val winSize = DoubleField()
+winSize.unit= "sec"
+winSize.min = 0.01
+winSize.max = 100.0
+winSize.value <--> "run:win-size-sec".attr(1.0)
+
+val running = r.state sig_== 3
+render.clicked ---> r.run
+cancel.clicked ---> r.stop
+render.enabled  = !running
+cancel.enabled  = running
+pb.value        = (r.progress * 100).toInt
+
+val p = GridPanel(
+  Label("Input:" ), in,
+  Label("Output:"), out,
+  Label(" "), Empty(),
+  Label("Stretch Factor:" ), stretch,
+  Label("Window Length:"  ), winSize,
+)
+p.columns = 2
+p.border  = Border.Empty(8)
+p.hGap    = 8
+p.compact = true
+
+BorderPanel(
+  north = p,
+  south = BorderPanel(
+    center  = pb,
+    east    = FlowPanel(cancel, render)
+  )
+)
+```
+
+@@@ note
+
+Future versions will likely see a macro to set up the render/cancel/progress-bar part of the widget
+program with less ceremony.
+
+@@@
+
+![Final Rendered Widget Program](.../tut-paulstretch-widget-ui-final.png)
+
+## Download the Workspace
+
+You can obtain a ready-made workspace containing the final versions of the programs, by downloading
+the `PaulStretch.mllt.zip` file from the @link:[Mellite downloads](https://archive.org/download/Mellite).
+After extracting the zip archive, use the menu item _File → Open…_ from Mellite's main window and select the
+`PaulStretch.mllt` directory in the chooser.

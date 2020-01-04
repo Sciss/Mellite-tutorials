@@ -1,16 +1,32 @@
+/*
+ *  Tutorial.scala
+ *  (Mellite-tutorials)
+ *
+ *  Copyright (c) 2019-2020 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is published under the GNU Affero General Public License v3+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.mellite.tutorials
 
 import java.awt.event.{ActionListener, ComponentAdapter, ComponentEvent, ComponentListener, HierarchyEvent, HierarchyListener, InputEvent}
 import java.awt.geom.{AffineTransform, GeneralPath}
 import java.awt.image.BufferedImage
 import java.awt.{BasicStroke, Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Image, MouseInfo, Point, Rectangle, RenderingHints, Robot}
+import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.Window
 import de.sciss.file._
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
+import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.Sys
-import de.sciss.mellite.{AttrMapFrame, LogFrame, MainFrame, Mellite}
+import de.sciss.mellite.tutorials.TutorialPaulStretchShots.S
+import de.sciss.mellite.{ActionOpenWorkspace, AttrMapFrame, LogFrame, MainFrame, Mellite, Prefs}
 import de.sciss.synth.proc.{Universe, Workspace}
 import de.sciss.treetable.j.{TreeTable => JTreeTable}
 import de.sciss.treetable.{TreeColumnModel, TreeTable}
@@ -19,6 +35,7 @@ import javax.swing.event.{ChangeEvent, ChangeListener}
 import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JTable, JWindow, MenuElement, Timer}
 
 import scala.annotation.tailrec
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.swing.{Button, Component, Graphics2D, Swing, Table, TextField, UIElement}
 import scala.util.control.NonFatal
@@ -57,6 +74,25 @@ trait Tutorial {
   def isEDT: Boolean = EventQueue.isDispatchThread
 
   def requireEDT(): Unit = require(isEDT)
+
+
+  def openWorkspaceInGUI(w: Workspace[S]): Unit = {
+    requireEDT()
+    val u = Mellite.mkUniverse(w)
+    ActionOpenWorkspace.openGUI(u)
+  }
+
+  def mkTempWorkspace(name: String): Workspace.Durable = {
+    val config          = BerkeleyDB.Config()
+    config.allowCreate  = true
+    val folderP         = createTempDir()
+    val folder          = folderP / s"$name.mllt"
+    val ds              = BerkeleyDB.factory(folder, config)
+    config.lockTimeout  = Duration(Prefs.dbLockTimeout.getOrElse(Prefs.defaultDbLockTimeout), TimeUnit.MILLISECONDS)
+    val w               = Workspace.Durable.empty(folder, ds)
+    openWorkspaceInGUI(w)
+    w
+  }
 
   def onEDT[A](body: => A): Future[A] = {
     val res = Promise[A]()

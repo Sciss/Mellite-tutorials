@@ -4,7 +4,7 @@ lazy val baseNameL = baseName.toLowerCase
 // ---- dependencies ----
 
 lazy val deps = new {
-//  val jemmy   = "2.0.0"
+  val fscape  = "2.33.0"
   val mellite = "2.42.0"
 }
 
@@ -22,6 +22,7 @@ lazy val commonSettings = Seq(
     "-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xlint:-stars-align,_", "-Xsource:2.13"
   ),
   scalacOptions in (Compile, compile) ++= (if (scala.util.Properties.isJavaAtLeast("9")) Seq("-release", "8") else Nil), // JDK >8 breaks API; skip scala-doc
+  scalacOptions += "-Yrangepos",  // this is needed to extract source code
 )
 
 // ---- projects ----
@@ -30,11 +31,8 @@ lazy val root = project.withId(baseNameL).in(file("."))
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "de.sciss"          %%  "mellite-app"     % deps.mellite,
-//      "org.netbeans" % "jemmy" % "2.2.7.5",
-//      "org.adoptopenjdk"  %   "jemmy"           % deps.jemmy,
-//      "org.adoptopenjdk"  %   "jemmy-core"      % deps.jemmy,
-//      "org.adoptopenjdk"  %   "jemmy-awt-input" % deps.jemmy,
+      "de.sciss" %% "mellite-app"   % deps.mellite,
+      "de.sciss" %% "fscape-macros" % deps.fscape,
     ),
   )
 
