@@ -1,6 +1,6 @@
 # Mellite-tutorials
 
-[![Build Status](https://travis-ci.org/Sciss/Mellite-tutorials.svg?branch=master)](https://travis-ci.org/Sciss/Mellite-tutorials)
+[![Build Status](https://github.com/Sciss/Mellite-tutorials/workflows/Scala%20CI/badge.svg?branch=main)](https://github.com/Sciss/Mellite-tutorials/actions?query=workflow%3A%22Scala+CI%22)
 
 ## statement
 
