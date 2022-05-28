@@ -4,8 +4,8 @@ lazy val baseNameL = baseName.toLowerCase
 // ---- dependencies ----
 
 lazy val deps = new {
-  val fscape  = "2.33.0"
-  val mellite = "2.42.0"
+  val fscape  = "3.15.0"
+  val mellite = "3.13.0"  // app
 }
 
 // ---- common ----
@@ -16,8 +16,8 @@ lazy val commonSettings = Seq(
   licenses            := Seq("GNU Affero General Public License v3+" -> url("http://www.gnu.org/licenses/agpl-3.0.txt")),
   description         := "Tutorials for the computer music environment Mellite",
   version             := "0.1.0-SNAPSHOT",
-  scalaVersion        := "2.12.10",
-  crossScalaVersions  := Seq("2.13.0", "2.12.10"),  // N.B. nsc API has breakage in minor versions (2.13.0 Dotterweide fails on 2.13.1)
+  scalaVersion        := "2.13.7",
+  crossScalaVersions  := Seq("2.13.7"), // , "2.12.10"),  // N.B. nsc API has breakage in minor versions (2.13.0 Dotterweide fails on 2.13.1)
   scalacOptions      ++= Seq(
     "-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xlint:-stars-align,_", "-Xsource:2.13"
   ),

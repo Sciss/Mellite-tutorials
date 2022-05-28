@@ -14,12 +14,12 @@
 package de.sciss.mellite.tutorials
 
 import de.sciss.file._
-import de.sciss.fscape.lucre.FScape
-import de.sciss.lucre.expr.BooleanObj
-import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.stm.{Folder, Sys}
-import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.{Durable, SoundProcesses, Widget, Workspace}
+import de.sciss.fscape.lucre.MacroImplicits.FScapeMacroOps
+import de.sciss.lucre.{BooleanObj, Folder, Txn}
+import de.sciss.lucre.store.BerkeleyDB
+import de.sciss.proc.Implicits.ObjOps
+import de.sciss.proc.MacroImplicits.WidgetMacroOps
+import de.sciss.proc.{Durable, FScape, SoundProcesses, Widget, Workspace}
 
 // This creates the downloadable final workspace inside `~/mellite/sessions/`
 object MkPaulStretchWorkspace {
@@ -31,7 +31,7 @@ object MkPaulStretchWorkspace {
 
   val name = "PaulStretch"
 
-  type S = Durable
+  type T = Durable.Txn
 
   def run(target: File): Unit = {
     SoundProcesses.init()
@@ -40,24 +40,24 @@ object MkPaulStretchWorkspace {
 
     require(!target.exists(), s"Workspace '${target.name}' already exists. Not overwriting.")
     val ds = BerkeleyDB.factory(target)
-    val ws = Workspace.Durable.empty(target, ds)
+    val ws = Workspace.Durable.empty(target.toURI, ds)
     ws.cursor.step { implicit tx =>
       populate(ws)
       ws.dispose()
     }
   }
 
-  def populate(ws: Workspace[S])(implicit tx: S#Tx): Unit = {
+  def populate(ws: Workspace[T])(implicit tx: T): Unit = {
     val r = ws.root
     add(r)
   }
 
-  def add[S <: Sys[S]](f: Folder[S])(implicit tx: S#Tx): Unit = {
+  def add[T <: Txn[T]](f: Folder[T])(implicit tx: T): Unit = {
     val m = this
 
-    val fsc   = m.apply[S]()
+    val fsc   = m.apply[T]()
     fsc.name  = m.name
-    val w     = m.ui[S]()
+    val w     = m.ui[T]()
     w.name    = m.name
     w.attr.put("run"       , fsc)
     w.attr.put("edit-mode" , BooleanObj.newVar(false))
@@ -66,27 +66,26 @@ object MkPaulStretchWorkspace {
 
   def any2stringadd: Any = () // WTF Scala
 
-  def apply[S <: Sys[S]]()(implicit tx: S#Tx): FScape[S] = {
+  def apply[T <: Txn[T]]()(implicit tx: T): FScape[T] = {
     import de.sciss.fscape.lucre.graph.Ops._
     import de.sciss.fscape.lucre.graph._
-    val f = FScape[S]()
+    val f = FScape[T]()
     import de.sciss.fscape.graph.{AudioFileIn => _, AudioFileOut => _, _}
-    import de.sciss.fscape.lucre.MacroImplicits._
     f.setGraph {
       // version: 04-Jan-2020
       val in          = AudioFileIn("in")
-      val winSizeSec  =  "win-size-sec" .attr(1.0)
-      val stretch     = "stretch"       .attr(8.0).max(1.0)
-      val fileType    = "out-type"      .attr(0)
-      val smpFmt      = "out-format"    .attr(2)
+      val winSizeSec  = "win-size-sec".attr(1.0)
+      val stretch     = "stretch"     .attr(8.0).max(1.0)
+      val fileType    = "out-type"    .attr(0)
+      val smpFmt      = "out-format"  .attr(2)
 
       val N           = 4   // output window overlap
       val sr          = in.sampleRate
       val numFramesIn = in.numFrames
-      val winSize     = (winSizeSec * sr).roundTo(1).max(1)
-      val stepSizeOut = (winSize / N).roundTo(1).max(1)
-      val stepSizeIn  = (winSize / (N * stretch)).roundTo(1).max(1)
-      val numStepsIn  = (numFramesIn / stepSizeIn).ceil
+      val winSize     = (winSizeSec * sr).roundTo(1).toInt.max(1)
+      val stepSizeOut = (winSize.toDouble / N).roundTo(1).toInt.max(1)
+      val stepSizeIn  = (winSize / (N * stretch)).roundTo(1).toInt.max(1)
+      val numStepsIn  = (numFramesIn.toDouble / stepSizeIn).ceil.toInt
       val numFramesOut= (numStepsIn - 1).max(0) * stepSizeOut + winSize
       val slidIn      = Sliding(in, size = winSize, step = stepSizeIn)
       val winAna      = GenWindow(winSize, shape = GenWindow.Hann)
@@ -115,12 +114,11 @@ object MkPaulStretchWorkspace {
     f
   }
 
-  def ui[S <: Sys[S]]()(implicit tx: S#Tx): Widget[S] = {
+  def ui[T <: Txn[T]]()(implicit tx: T): Widget[T] = {
     import de.sciss.lucre.expr.ExImport._
     import de.sciss.lucre.expr.graph._
     import de.sciss.lucre.swing.graph._
-    val w = Widget[S]()
-    import de.sciss.synth.proc.MacroImplicits._
+    val w = Widget[T]()
     w.setGraph {
       // version: 04-Jan-2020
       val r       = Runner("run")
@@ -131,25 +129,25 @@ object MkPaulStretchWorkspace {
       cancel.tooltip = "Cancel Rendering"
       val pb      = ProgressBar()
 
-      in .value         <--> Artifact("run:in")
-      out.value         <--> Artifact("run:out")
-      out.fileType      <--> "run:out-type"   .attr(0)
-      out.sampleFormat  <--> "run:out-format" .attr(2)
+      in .value         <-> Artifact("run:in")
+      out.value         <-> Artifact("run:out")
+      out.fileType      <-> "run:out-type"   .attr(0)
+      out.sampleFormat  <-> "run:out-format" .attr(2)
 
       val stretch = DoubleField()
       stretch.min = 1.0
       stretch.max = 1.0e18
-      stretch.value <--> "run:stretch".attr(8.0)
+      stretch.value <-> "run:stretch".attr(8.0)
 
       val winSize = DoubleField()
       winSize.unit= "sec"
       winSize.min = 0.01
       winSize.max = 100.0
-      winSize.value <--> "run:win-size-sec".attr(1.0)
+      winSize.value <-> "run:win-size-sec".attr(1.0)
 
       val running = r.state sig_== 3
-      render.clicked ---> r.run
-      cancel.clicked ---> r.stop
+      render.clicked --> r.run
+      cancel.clicked --> r.stop
       render.enabled  = !running
       cancel.enabled  = running
       pb.value        = (r.progress * 100).toInt

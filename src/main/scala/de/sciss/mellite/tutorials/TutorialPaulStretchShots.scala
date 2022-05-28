@@ -13,16 +13,13 @@
 
 package de.sciss.mellite.tutorials
 
-import java.awt.event.KeyEvent
-
+import de.sciss.audiofile.AudioFile
 import de.sciss.file._
-import de.sciss.fscape.lucre.FScape
-import de.sciss.lucre.artifact.{ArtifactLocation, Artifact => AArtifact}
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, LongObj}
-import de.sciss.synth.io.AudioFile
-import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.{AudioCue, Durable, Widget}
+import de.sciss.lucre.{ArtifactLocation, BooleanObj, DoubleObj, LongObj, Artifact => AArtifact}
+import de.sciss.proc.{AudioCue, Durable, FScape, Widget}
+import de.sciss.proc.Implicits.ObjOps
 
+import java.awt.event.KeyEvent
 import scala.concurrent.Future
 
 // This creates all screenshots of the tutorial
@@ -37,7 +34,7 @@ object TutorialPaulStretchShots extends Tutorial {
   val afName              = "337048_131348kaonayabell"
   def overwriteSnaps      = false
 
-  type S = Durable
+  type T = Durable.Txn
 
   def started(): Future[Unit] = {
     for {
@@ -59,7 +56,7 @@ object TutorialPaulStretchShots extends Tutorial {
           val wid = ws.root.head
           val fsc = wid.attr.$[FScape]("run").get
           val (loc, _, artIn) = mkInputArtifact()
-          val artOut = AArtifact[S](loc, AArtifact.Child("bell-stretched.aif"))
+          val artOut = AArtifact[T](loc, AArtifact.Child("bell-stretched.aif"))
           fsc.attr.put("in" , artIn)
           fsc.attr.put("out", artOut)
         }
@@ -78,13 +75,13 @@ object TutorialPaulStretchShots extends Tutorial {
     } yield ()
   }
 
-  def mkInputArtifact()(implicit tx: S#Tx): (ArtifactLocation[S], AudioCue.Obj[S], AArtifact[S]) = {
-    val loc   = ArtifactLocation.newVar[S](ArtifactLocation.newConst[S](paradoxBase.absolute))
+  def mkInputArtifact()(implicit tx: T): (ArtifactLocation[T], AudioCue.Obj[T], AArtifact[T]) = {
+    val loc   = ArtifactLocation.newVar[T](ArtifactLocation.newConst[T](paradoxBase.absolute.toURI))
     loc.name  = paradoxBase.base
     val af    = paradoxBase / s"$afName.wav"
     val spec  = AudioFile.readSpec(af)
-    val art   = AArtifact[S](loc, af)
-    val cue   = AudioCue.Obj[S](art, spec, LongObj.newVar[S](0L), DoubleObj.newVar[S](1.0))
+    val art   = AArtifact[T](loc, af.toURI)
+    val cue   = AudioCue.Obj[T](art, spec, LongObj.newVar[T](0L), DoubleObj.newVar[T](1.0))
     cue.name  =  af.base
     (loc, cue, art)
   }
@@ -257,7 +254,7 @@ object TutorialPaulStretchShots extends Tutorial {
         ws.cursor.step { implicit tx =>
           val f   = ws.root
           val fsc = f.head
-          mkAttrMapFrame[S](ws, fsc)
+          mkAttrMapFrame[T](ws, fsc)
         }
       }
       _ <- onEDT {
@@ -320,9 +317,9 @@ object TutorialPaulStretchShots extends Tutorial {
         ws.cursor.step { implicit tx =>
           val f   = ws.root
           val fsc = f.head
-          val cue = f.last.asInstanceOf[AudioCue.Obj.Apply[S]]
+          val cue = f.last.asInstanceOf[AudioCue.Obj.Apply[T]]
           val loc = cue.artifact.location
-          val artOut = AArtifact[S](loc, AArtifact.Child("normalized.aif"))
+          val artOut = AArtifact[T](loc, AArtifact.Child("normalized.aif"))
           fsc.attr.put("out", artOut)
         }
       }
@@ -363,7 +360,7 @@ object TutorialPaulStretchShots extends Tutorial {
           val fsc = f.head
           val wid = f.last
           wid.attr.put("run", fsc)
-          mkAttrMapFrame[S](ws, wid)
+          mkAttrMapFrame[T](ws, wid)
         }
       }
       _ <- delay()
@@ -374,7 +371,7 @@ object TutorialPaulStretchShots extends Tutorial {
       _ <- onEDT {
         ws.cursor.step { implicit tx =>
           val f = ws.root
-          val wid = f.last.asInstanceOf[Widget[S]]
+          val wid = f.last.asInstanceOf[Widget[T]]
           wid.graph() = Widget.Graph {
             import de.sciss.lucre.expr.graph._
             import de.sciss.lucre.swing.graph._
@@ -384,12 +381,12 @@ object TutorialPaulStretchShots extends Tutorial {
             val render  = Button(" Render ")
             val cancel  = Button(" X ")
 
-            in .value <--> Artifact("run:in")
-            out.value <--> Artifact("run:out")
+            in .value <-> Artifact("run:in")
+            out.value <-> Artifact("run:out")
 
             val running = r.state sig_== 3
-            render.clicked ---> r.run
-            cancel.clicked ---> r.stop
+            render.clicked --> r.run
+            cancel.clicked --> r.stop
             render.enabled = !running
             cancel.enabled = running
 
@@ -407,7 +404,7 @@ object TutorialPaulStretchShots extends Tutorial {
               south = FlowPanel(cancel, render),
             )
           }
-          wid.attr.put("edit-mode", BooleanObj.newVar[S](false))
+          wid.attr.put("edit-mode", BooleanObj.newVar[T](false))
         }
         wWorkspace.front()
       }

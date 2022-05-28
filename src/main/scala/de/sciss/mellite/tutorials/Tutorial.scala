@@ -13,27 +13,26 @@
 
 package de.sciss.mellite.tutorials
 
+import de.sciss.desktop.Window
+import de.sciss.file._
+import de.sciss.lucre.store.BerkeleyDB
+import de.sciss.lucre.synth.Txn
+import de.sciss.lucre.{Cursor, Obj, Workspace}
+import de.sciss.mellite.tutorials.TutorialPaulStretchShots.T
+import de.sciss.mellite.{AttrMapFrame, LogFrame, MainFrame, Mellite, OpenWorkspace, Prefs, UniverseHandler}
+import de.sciss.proc
+import de.sciss.proc.Universe
+import de.sciss.treetable.j.{TreeTable => JTreeTable}
+import de.sciss.treetable.{TreeColumnModel, TreeTable}
+
 import java.awt.event.{ActionListener, ComponentAdapter, ComponentEvent, ComponentListener, HierarchyEvent, HierarchyListener, InputEvent}
 import java.awt.geom.{AffineTransform, GeneralPath}
 import java.awt.image.BufferedImage
 import java.awt.{BasicStroke, Color, EventQueue, GraphicsConfiguration, GraphicsDevice, GraphicsEnvironment, Image, MouseInfo, Point, Rectangle, RenderingHints, Robot}
 import java.util.concurrent.TimeUnit
-
-import de.sciss.desktop.Window
-import de.sciss.file._
-import de.sciss.lucre.stm
-import de.sciss.lucre.stm.Obj
-import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.Sys
-import de.sciss.mellite.tutorials.TutorialPaulStretchShots.S
-import de.sciss.mellite.{ActionOpenWorkspace, AttrMapFrame, LogFrame, MainFrame, Mellite, Prefs}
-import de.sciss.synth.proc.{Universe, Workspace}
-import de.sciss.treetable.j.{TreeTable => JTreeTable}
-import de.sciss.treetable.{TreeColumnModel, TreeTable}
 import javax.imageio.ImageIO
 import javax.swing.event.{ChangeEvent, ChangeListener}
 import javax.swing.{JDialog, JFrame, JMenu, JMenuBar, JMenuItem, JPopupMenu, JTable, JWindow, MenuElement, Timer}
-
 import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -76,20 +75,20 @@ trait Tutorial {
   def requireEDT(): Unit = require(isEDT)
 
 
-  def openWorkspaceInGUI(w: Workspace[S]): Unit = {
+  def openWorkspaceInGUI(w: Workspace[T]): Unit = {
     requireEDT()
     val u = Mellite.mkUniverse(w)
-    ActionOpenWorkspace.openGUI(u)
+    OpenWorkspace.openGUI(u)
   }
 
-  def mkTempWorkspace(name: String): Workspace.Durable = {
+  def mkTempWorkspace(name: String): proc.Workspace.Durable = {
     val config          = BerkeleyDB.Config()
     config.allowCreate  = true
     val folderP         = createTempDir()
     val folder          = folderP / s"$name.mllt"
     val ds              = BerkeleyDB.factory(folder, config)
     config.lockTimeout  = Duration(Prefs.dbLockTimeout.getOrElse(Prefs.defaultDbLockTimeout), TimeUnit.MILLISECONDS)
-    val w               = Workspace.Durable.empty(folder, ds)
+    val w               = proc.Workspace.Durable.empty(folder.toURI, ds)
     openWorkspaceInGUI(w)
     w
   }
@@ -118,7 +117,7 @@ trait Tutorial {
     def run(): Unit =
       try {
         val a = body
-        res.tryCompleteWith(a)
+        res.completeWith(a)
       } catch {
         case NonFatal(ex) =>
           res.tryFailure(ex)
@@ -284,7 +283,7 @@ trait Tutorial {
         m.removeHierarchyListener(hl)
         val fut = moveOverMenu(m, press = press)
 //         println("---1")
-        res1.tryCompleteWith(fut)
+        res1.completeWith(fut)
       }
 
       lazy val cl: ComponentListener = new ComponentAdapter {
@@ -434,10 +433,11 @@ trait Tutorial {
       ensureFlatEDT(snapComponentEDT(c, name, pointer = pointer, code = code))
     )
 
-  def mkAttrMapFrame[S <: Sys[S]](ws: Workspace[S], obj: Obj[S])(implicit tx: S#Tx): AttrMapFrame[S] = {
-    implicit val c  : stm.Cursor[S] = ws.cursor
-    implicit val _ws: Workspace [S] = ws
-    implicit val u  : Universe  [S] = Universe()
+  def mkAttrMapFrame[T <: Txn[T]](ws: Workspace[T], obj: Obj[T])(implicit tx: T): AttrMapFrame[T] = {
+    implicit val c  : Cursor    [T] = ws.cursor
+    implicit val _ws: Workspace [T] = ws
+    implicit val u  : Universe  [T] = Universe()
+    implicit val uh : UniverseHandler  [T] = UniverseHandler()
     AttrMapFrame(obj)
   }
 
